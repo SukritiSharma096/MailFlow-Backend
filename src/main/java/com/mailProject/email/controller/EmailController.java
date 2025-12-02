@@ -1,6 +1,5 @@
 package com.mailProject.email.controller;
 
-
 import com.mailProject.email.entity.MessageMail;
 import com.mailProject.email.model.CustomResponse;
 import com.mailProject.email.model.EmailRequest;
@@ -11,10 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -26,10 +23,7 @@ public class EmailController {
 
     @PostMapping("/send")
     public ResponseEntity<?> sendEmail(@RequestBody EmailRequest request) {
-        // Call your service method
         emailService.sendEmail(request.getTo(), request.getSubject(), request.getMessage());
-
-        // Return response
         return ResponseEntity.ok(
                 CustomResponse.builder()
                         .message("Email sent successfully!!")
@@ -38,8 +32,6 @@ public class EmailController {
                         .build()
         );
     }
-
-
 
     @PostMapping("/send-multiple")
     public ResponseEntity<String> sendMultipleEmail(@RequestBody EmailRequest request) {
@@ -50,6 +42,7 @@ public class EmailController {
         );
         return ResponseEntity.ok("Multiple emails sent successfully!");
     }
+
 
     @PostMapping(
             value = "/send-with-file",
@@ -70,9 +63,6 @@ public class EmailController {
 
         return ResponseEntity.ok("Email with attachment sent successfully!");
     }
-
-
-
 
     @PostMapping("/send-html")
     public ResponseEntity<String> sendEmailWithHtml(@RequestParam String to, @RequestParam String subject, @RequestParam String htmlContent) {
@@ -132,5 +122,11 @@ public class EmailController {
     public ResponseEntity<String> movePokemonGo() {
         emailService.movePokemonGoMails();
         return ResponseEntity.ok("PokemonGo mails moved successfully");
+    }
+
+    @PostMapping("/move/read")
+    public ResponseEntity<String> moveReadMails() {
+        emailService.moveReadMails();
+        return ResponseEntity.ok("All READ mails labeled successfully!");
     }
 }

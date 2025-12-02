@@ -16,4 +16,5 @@ public interface EmailEntityService {
     EmailResponse updateEmail(Long id, EmailEntityRequest request);
 
     String deleteEmail(Long id);
+
 }

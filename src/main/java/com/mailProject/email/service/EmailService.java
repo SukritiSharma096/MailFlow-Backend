@@ -17,8 +17,6 @@ public interface EmailService {
 
     void sendEmailWIthHtml(String to, String subject, String htmlContent);
 
-
-
     List<MessageMail> getInboxMessage();
 
     boolean deleteEmail(Long id);
@@ -27,5 +25,5 @@ public interface EmailService {
     void moveYouTubeMails();
     void moveNetflixMails();
     void movePokemonGoMails();
-
+    void moveReadMails();
 }

@@ -15,4 +15,5 @@ public class MessageMail {
     private String content;
     private List<String> files;
     private String subject;
+
 }

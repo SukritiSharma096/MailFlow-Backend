@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 
 @Setter
 @Getter
-
 public class EmailResponse {
 
     private Long id;

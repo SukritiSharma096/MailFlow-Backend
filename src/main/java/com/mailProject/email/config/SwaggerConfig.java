@@ -16,5 +16,6 @@ import org.springframework.context.annotation.Configuration;
                             .title("Mail Flow API")
                             .version("1.0")
                             .description("This is the API documentation for Mail Flow "));
+            
         }
 }

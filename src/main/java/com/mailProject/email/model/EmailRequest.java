@@ -12,11 +12,8 @@ import java.util.List;
 public class EmailRequest {
 
     private  String to;
-
     private List<String> toMultiple;
-
     private String subject;
-
     private String message;
 
 }

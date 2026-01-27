@@ -1,7 +1,10 @@
 package com.mailProject.email.service.impl;
 
+import com.mailProject.email.FeignInterface.ClickupClient;
 import com.mailProject.email.dto.EmailEntityRequest;
 import com.mailProject.email.dto.EmailResponse;
+import com.mailProject.email.dto.TaskRequest;
+import com.mailProject.email.dto.TaskResponse;
 import com.mailProject.email.entity.Email;
 import com.mailProject.email.repository.EmailRepo;
 import com.mailProject.email.service.EmailEntityService;
@@ -15,6 +18,7 @@ public class EmailEntityServiceImpl implements EmailEntityService {
 
     @Autowired
     private EmailRepo emailRepository;
+
 
     @Override
     public EmailResponse saveEmail(EmailEntityRequest request) {

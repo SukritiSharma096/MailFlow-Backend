@@ -11,6 +11,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Builder
 @Table(name = "emails")
 public class Email {
 
@@ -27,5 +28,8 @@ public class Email {
     private boolean isReceived;
     @ElementCollection
     private List<String> files;
+    private boolean taskCreated = false;
+    private String taskId;
+    private String messageId;
 
 }

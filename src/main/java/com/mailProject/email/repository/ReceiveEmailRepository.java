@@ -8,7 +8,13 @@ import java.util.Optional;
 
 public interface ReceiveEmailRepository extends JpaRepository<ReceivedEmails, Long> {
 
-    List<ReceivedEmails> findByAccountId(Long accountId);
-
     Optional<ReceivedEmails> findByIdAndAccountId(Long id, Long accountId);
+
+    Optional<ReceivedEmails> findById(Long id);
+
+    Optional<ReceivedEmails> findByMessageId(String messageId);
+
+    List<ReceivedEmails> findTop20ByAccountIdAndFolderOrderBySentAtDesc(Long accountId, String folder);
+
+
 }

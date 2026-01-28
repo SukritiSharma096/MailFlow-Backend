@@ -2,8 +2,9 @@ package com.mailProject.email;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
+@EnableScheduling
 @SpringBootApplication
 @EnableFeignClients
 public class EmailApplication {
@@ -11,6 +12,4 @@ public class EmailApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(EmailApplication.class, args);
 	}
-
-	
 }

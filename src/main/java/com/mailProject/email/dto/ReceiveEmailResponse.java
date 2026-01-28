@@ -25,4 +25,5 @@ public class ReceiveEmailResponse {
     private boolean isReceived;
     private List<String> attachments;
     private String folder;
+
 }

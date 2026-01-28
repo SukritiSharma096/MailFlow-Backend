@@ -22,6 +22,8 @@ public interface MultipleEmailService {
     void moveHDFCBankMails(Long accountId);
     void moveLinkedInMails(Long accountId);
     boolean deleteEmailFromDb(Long accountId, Long emailId);
-
+    boolean verifyPassword(String username, String password);
+    ReceiveEmailResponse getEmailById(Long id);
+    List<ReceiveEmailResponse> getInboxFromDb(Long accountId, String folder);
 
 }

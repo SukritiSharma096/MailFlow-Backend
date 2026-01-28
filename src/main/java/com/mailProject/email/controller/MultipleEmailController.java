@@ -1,38 +1,61 @@
 package com.mailProject.email.controller;
 
-
-import com.mailProject.email.dto.MultipleEmailRequest;
-import com.mailProject.email.dto.MultipleEmailResponse;
-import com.mailProject.email.dto.SendEmailRequest;
+import com.mailProject.email.dto.*;
+import com.mailProject.email.repository.MultipleEmailRepository;
+import com.mailProject.email.repository.ReceiveEmailRepository;
 import com.mailProject.email.service.MultipleEmailService;
-import org.springframework.http.HttpStatus;
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.tomcat.util.http.fileupload.IOUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
-
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/accounts")
+@CrossOrigin("*")
 public class MultipleEmailController {
+
+    @Autowired
+    private MultipleEmailRepository multipleEmailRepository;
+
+    @Autowired
+    private ReceiveEmailRepository receiveEmailRepository;
 
     private final MultipleEmailService service;
 
+    @Autowired
     public MultipleEmailController(MultipleEmailService service) {
         this.service = service;
     }
 
     @PostMapping("/save")
-    public ResponseEntity<MultipleEmailResponse> create(@RequestBody MultipleEmailRequest req) {
-        return ResponseEntity.ok(service.createAccount(req));
+    public ResponseEntity<?> create(@RequestBody MultipleEmailRequest req) {
+        if (req.getPassword() == null || !StringUtils.hasText(req.getPassword())) {
+            return ResponseEntity.badRequest().body("Password is required and must not be blank");
+        }
+        try {
+            MultipleEmailResponse resp = service.createAccount(req);
+            return ResponseEntity.ok(resp);
+        } catch (IllegalArgumentException iae) {
+            return ResponseEntity.badRequest().body(iae.getMessage());
+        } catch (Exception ex) {
+            return ResponseEntity.status(500).body("Failed to create account: " + ex.getMessage());
+        }
     }
 
-    @GetMapping("/getAll")
+    @GetMapping
     public ResponseEntity<List<MultipleEmailResponse>> list() {
         return ResponseEntity.ok(service.listAccounts());
     }
-
 
     @GetMapping("/{id}")
     public ResponseEntity<MultipleEmailResponse> get(@PathVariable Long id) {
@@ -40,8 +63,13 @@ public class MultipleEmailController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<MultipleEmailResponse> update(@PathVariable Long id, @RequestBody MultipleEmailRequest req) {
-        return ResponseEntity.ok(service.updateAccount(id, req));
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody MultipleEmailRequest req) {
+        try {
+            MultipleEmailResponse resp = service.updateAccount(id, req);
+            return ResponseEntity.ok(resp);
+        } catch (Exception ex) {
+            return ResponseEntity.status(500).body("Failed to update account: " + ex.getMessage());
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -50,7 +78,6 @@ public class MultipleEmailController {
         return ResponseEntity.noContent().build();
     }
 
-    // ===============================================================================================================
 
 
     @PostMapping("/{id}/send")
@@ -62,7 +89,6 @@ public class MultipleEmailController {
             return ResponseEntity.status(500).body("Send failed: " + ex.getMessage());
         }
     }
-
 
     @PostMapping(value = "/sendWithAttachments/{accountId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> sendEmailWithAttachments(
@@ -77,6 +103,10 @@ public class MultipleEmailController {
         }
     }
 
+
+
+
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/inbox/{accountId}")
     public ResponseEntity<?> getInbox(@PathVariable Long accountId) {
         try {
@@ -85,6 +115,7 @@ public class MultipleEmailController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
     @PostMapping("/move/google/{id}")
     public ResponseEntity<?> moveGoogle(@PathVariable Long id) {
         service.moveGoogleMails(id);
@@ -110,15 +141,15 @@ public class MultipleEmailController {
     }
 
     @PostMapping("/move/hdfc/{id}")
-    public ResponseEntity<?> moveHDFCBankMails(@PathVariable Long id){
+    public ResponseEntity<?> moveHDFCBankMails(@PathVariable Long id) {
         service.moveHDFCBankMails(id);
         return ResponseEntity.ok("HDFC bank mails moved");
     }
 
     @PostMapping("/move/linkedIn/{id}")
-    public ResponseEntity<?> moveLinkedInMails(@PathVariable Long id){
+    public ResponseEntity<?> moveLinkedInMails(@PathVariable Long id) {
         service.moveLinkedInMails(id);
-        return  ResponseEntity.ok("Linkedin mails moved");
+        return ResponseEntity.ok("Linkedin mails moved");
     }
 
     @DeleteMapping("/{accountId}/delete/{emailId}")
@@ -130,6 +161,74 @@ public class MultipleEmailController {
         return ResponseEntity.ok(
                 "Email with ID " + emailId + " deleted successfully from account " + accountId
         );
+    }
+
+    @PostMapping("/verify-password")
+    public ResponseEntity<?> verifyPassword(
+            @RequestBody MultipleEmailRequest request) {
+
+        boolean valid = service.verifyPassword(request.getUsername(), request.getPassword());
+
+        if (valid) {
+            return ResponseEntity.ok("Password verified");
+        } else {
+            return ResponseEntity.badRequest().body("Invalid password");
+        }
+    }
+
+    @GetMapping("/email/{id}")
+    public ResponseEntity<?> getEmailById(@PathVariable Long id) {
+        return ResponseEntity.ok(service.getEmailById(id));
+    }
+
+    @GetMapping("mail/attachments")
+    public void getAttachment(
+            @RequestParam String file,
+            HttpServletResponse response) throws Exception {
+
+        Path filePath = Paths.get("email_attachments").resolve(file);
+
+        if (!Files.exists(filePath)) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        String contentType = Files.probeContentType(filePath);
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        response.setContentType(contentType);
+        response.setHeader(
+                "Content-Disposition",
+                "inline; filename=\"" + file + "\""
+        );
+
+        try (InputStream in = Files.newInputStream(filePath)) {
+            IOUtils.copy(in, response.getOutputStream());
+        }
+    }
+
+
+    @GetMapping("/inbox/db/{accountId}")
+    public ResponseEntity<?> getInboxFromDb(
+            @PathVariable Long accountId,
+            @RequestParam(defaultValue = "INBOX") String folder) {
+
+        return ResponseEntity.ok(
+                service.getInboxFromDb(accountId, folder)
+        );
+    }
+
+    @GetMapping("/inbox/fetch/{accountId}")
+    public ResponseEntity<?> fetchInbox(@PathVariable Long accountId) {
+        try {
+            List<ReceiveEmailResponse> inbox = service.fetchInbox(accountId);
+            return ResponseEntity.ok(inbox);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("Failed to fetch inbox: " + e.getMessage());
+        }
     }
 
 }

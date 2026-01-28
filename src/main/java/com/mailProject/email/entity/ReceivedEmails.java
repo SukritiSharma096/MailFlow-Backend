@@ -18,6 +18,10 @@ public class ReceivedEmails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "message_id", unique = true)
+    private String messageId;
+
+
     private String sender;
 
     @Column(columnDefinition = "TEXT")

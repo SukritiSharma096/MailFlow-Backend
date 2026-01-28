@@ -1,5 +1,6 @@
 package com.mailProject.email.dto;
 
+import jakarta.persistence.Column;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,6 +9,7 @@ import lombok.Setter;
 public class MultipleEmailRequest {
 
     private String name;
+    @Column(unique = true)
     private String username;
     private String password;
     private String smtpHost;

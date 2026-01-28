@@ -15,9 +15,14 @@ import jakarta.mail.internet.MimeMultipart;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -34,7 +39,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         this.multipleEmailRepository = multipleEmailRepository;
     }
 
-    // -------------------- Convert Entity → Response DTO --------------------
     private MultipleEmailResponse toResponse(MultipleEmailAccounts e) {
         MultipleEmailResponse r = new MultipleEmailResponse();
         r.setId(e.getId());
@@ -53,10 +57,20 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
     @Override
     public MultipleEmailResponse createAccount(MultipleEmailRequest request) {
+
+        if (!StringUtils.hasText(request.getPassword())) {
+            throw new IllegalArgumentException("Password must not be empty or blank");
+        }
+
+        if (multipleEmailRepository.existsByUsername(request.getUsername())) {
+            throw new RuntimeException("Username already exists!");
+        }
+
         MultipleEmailAccounts e = new MultipleEmailAccounts();
+
         e.setName(request.getName());
         e.setUsername(request.getUsername());
-        e.setPassword(request.getPassword());
+        e.setPassword(request.getPassword().trim());
         e.setSmtpHost(request.getSmtpHost());
         e.setSmtpPort(request.getSmtpPort());
         e.setImapHost(request.getImapHost());
@@ -68,6 +82,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         e = multipleEmailRepository.save(e);
         return toResponse(e);
     }
+
 
     @Override
     public List<MultipleEmailResponse> listAccounts() {
@@ -91,7 +106,9 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         e.setName(request.getName());
         e.setUsername(request.getUsername());
-        if (request.getPassword() != null) e.setPassword(request.getPassword());
+        if (request.getPassword() != null && StringUtils.hasText(request.getPassword())) {
+            e.setPassword(request.getPassword().trim());
+        }
         e.setSmtpHost(request.getSmtpHost());
         e.setSmtpPort(request.getSmtpPort());
         e.setImapHost(request.getImapHost());
@@ -109,9 +126,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
     public void deleteAccount(Long id) {
         multipleEmailRepository.deleteById(id);
     }
-
-
-    // SMTP (Send Email)
 
     private Session createSmtpSession(MultipleEmailAccounts acc) {
         Properties props = new Properties();
@@ -223,37 +237,68 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                 .orElseThrow(() -> new RuntimeException("Account not found"));
 
         Store store = createImapStore(acc);
-
         Folder inbox = store.getFolder("INBOX");
         inbox.open(Folder.READ_ONLY);
 
-        Message[] messages = inbox.getMessages();
+        int totalMessages = inbox.getMessageCount();
+
+        if (totalMessages == 0) {
+            inbox.close(false);
+            store.close();
+            return List.of();
+        }
+
+        Message[] messages = inbox.getMessages(1, totalMessages);
+
         List<ReceiveEmailResponse> list = new ArrayList<>();
 
         for (Message msg : messages) {
 
-            ReceivedEmails e = new ReceivedEmails();
-            e.setSender(msg.getFrom()[0].toString());
-            e.setReceivers(String.join(",", getReceivers(msg)));
-            e.setSubject(msg.getSubject());
-            e.setBody(getBody(msg));
-            e.setSentAt(msg.getSentDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
-            e.setReceived(true);
-            e.setAttachments(String.join(",", getAttachments(msg)));
-            e.setFolder("INBOX");
-            e.setAccountId(accountId);
+            MimeMessage mimeMessage = (MimeMessage) msg;
+            String messageId = mimeMessage.getMessageID();
+            ReceivedEmails email = receiveEmailRepository
+                    .findByMessageId(messageId)
+                    .orElseGet(() -> {
 
-            receiveEmailRepository.save(e);
+                        ReceivedEmails e = new ReceivedEmails();
+                        e.setMessageId(messageId);
+
+                        try {
+                            e.setSender(msg.getFrom() != null ? msg.getFrom()[0].toString() : null);
+                            e.setReceivers(String.join(",", getReceivers(msg)));
+                            e.setSubject(msg.getSubject());
+                            e.setBody(getBody(msg));
+                            e.setAttachments(String.join(",", getAttachments(msg)));
+                            e.setSentAt(
+                                    msg.getSentDate() != null
+                                            ? msg.getSentDate().toInstant()
+                                            .atZone(ZoneId.systemDefault())
+                                            .toLocalDateTime()
+                                            : null
+                            );
+                        } catch (Exception ex) {
+                        }
+
+                        e.setReceived(true);
+                        e.setFolder("INBOX");
+                        e.setAccountId(accountId);
+
+                        return receiveEmailRepository.save(e);
+                    });
 
             ReceiveEmailResponse dto = new ReceiveEmailResponse();
-            dto.setId(e.getId());
-            dto.setSender(e.getSender());
-            dto.setReceiver(getReceivers(msg));
-            dto.setSubject(e.getSubject());
-            dto.setBody(e.getBody());
-            dto.setSentAt(e.getSentAt());
+            dto.setId(email.getId());
+            dto.setSender(email.getSender());
+            dto.setReceiver(List.of(email.getReceivers()));
+            dto.setSubject(email.getSubject());
+            dto.setBody(email.getBody());
+            dto.setSentAt(email.getSentAt());
             dto.setReceived(true);
-            dto.setAttachments(getAttachments(msg));
+            dto.setAttachments(
+                    email.getAttachments() != null
+                            ? List.of(email.getAttachments().split(","))
+                            : List.of()
+            );
             dto.setFolder("INBOX");
 
             list.add(dto);
@@ -264,6 +309,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         return list;
     }
+
 
     private List<String> getReceivers(Message msg) throws MessagingException {
         List<String> list = new ArrayList<>();
@@ -283,32 +329,62 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
     }
 
     private String extractMultipart(Multipart mp) throws Exception {
-        StringBuilder sb = new StringBuilder();
+        String plainText = null;
+
         for (int i = 0; i < mp.getCount(); i++) {
             BodyPart part = mp.getBodyPart(i);
-            if (part.isMimeType("text/plain") || part.isMimeType("text/html")) {
-                sb.append(part.getContent());
+
+            if (part.isMimeType("text/html")) {
+                return part.getContent().toString();
+            } else if (part.isMimeType("text/plain") && plainText == null) {
+                plainText = part.getContent().toString();
             } else if (part.getContent() instanceof Multipart) {
-                sb.append(extractMultipart((Multipart) part.getContent()));
+                String nested = extractMultipart((Multipart) part.getContent());
+                if (nested != null && !nested.isEmpty()) return nested;
             }
         }
-        return sb.toString();
+
+        return plainText != null ? plainText : "";
     }
 
+
     private List<String> getAttachments(Message msg) throws Exception {
-        List<String> f = new ArrayList<>();
-        if (msg.isMimeType("multipart/*")) {
-            Multipart mp = (Multipart) msg.getContent();
-            for (int i = 0; i < mp.getCount(); i++) {
-                BodyPart p = mp.getBodyPart(i);
-                if (Part.ATTACHMENT.equalsIgnoreCase(p.getDisposition()) || p.getFileName() != null) {
-                    f.add(p.getFileName());
+        List<String> attachments = new ArrayList<>();
+
+        if (!msg.isMimeType("multipart/*")) {
+            return attachments;
+        }
+
+        Multipart mp = (Multipart) msg.getContent();
+
+        for (int i = 0; i < mp.getCount(); i++) {
+
+            BodyPart part = mp.getBodyPart(i);
+
+            String disposition = part.getDisposition();
+            String filename = part.getFileName();
+
+            if (disposition == null && filename == null) {
+                continue;
+            }
+
+            if (filename != null) {
+
+                attachments.add(filename);
+
+                Path folder = Paths.get("email_attachments");
+                if (!Files.exists(folder)) Files.createDirectories(folder);
+
+                Path filePath = folder.resolve(filename);
+
+                try (InputStream in = part.getInputStream()) {
+                    Files.copy(in, filePath, StandardCopyOption.REPLACE_EXISTING);
                 }
             }
         }
-        return f;
-    }
 
+        return attachments;
+    }
 
     // MOVE FILTER
 
@@ -385,5 +461,70 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         return true;
     }
 
+
+    @Override
+    public boolean verifyPassword(String username, String password) {
+
+        MultipleEmailAccounts account =
+                multipleEmailRepository.findByUsername(username)
+                        .orElseThrow(() ->
+                                new RuntimeException("Email account not found"));
+
+        return account.getPassword().equals(password);
+    }
+
+
+    @Override
+    public ReceiveEmailResponse getEmailById(Long id) {
+
+        ReceivedEmails e = receiveEmailRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Email not found"));
+
+        ReceiveEmailResponse dto = new ReceiveEmailResponse();
+        dto.setId(e.getId());
+        dto.setSender(e.getSender());
+        dto.setReceiver(Arrays.asList(e.getReceivers().split(",")));
+        dto.setSubject(e.getSubject());
+        dto.setBody(e.getBody());
+        dto.setSentAt(e.getSentAt());
+        dto.setFolder(e.getFolder());
+        dto.setReceived(e.isReceived());
+
+        if (e.getAttachments() != null) {
+            dto.setAttachments(Arrays.asList(e.getAttachments().split(",")));
+        }
+
+        return dto;
+    }
+
+
+    public List<ReceiveEmailResponse> getInboxFromDb(Long accountId, String folder) {
+
+        List<ReceivedEmails> emails =
+                receiveEmailRepository
+                        .findTop20ByAccountIdAndFolderOrderBySentAtDesc(accountId, folder);
+
+        return emails.stream().map(e -> {
+            ReceiveEmailResponse dto = new ReceiveEmailResponse();
+            dto.setId(e.getId());
+            dto.setSender(e.getSender());
+            dto.setReceiver(
+                    e.getReceivers() != null
+                            ? Arrays.asList(e.getReceivers().split(","))
+                            : List.of()
+            );
+            dto.setSubject(e.getSubject());
+            dto.setBody(e.getBody());
+            dto.setSentAt(e.getSentAt());
+            dto.setReceived(e.isReceived());
+            dto.setFolder(e.getFolder());
+            dto.setAttachments(
+                    e.getAttachments() != null
+                            ? Arrays.asList(e.getAttachments().split(","))
+                            : List.of()
+            );
+            return dto;
+        }).toList();
+    }
 
 }

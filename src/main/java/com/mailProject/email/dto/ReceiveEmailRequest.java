@@ -14,7 +14,6 @@ import java.util.List;
 @Setter
 public class ReceiveEmailRequest {
 
-    private Long id;
     private String sender;
     private List<String> receiver;
     private String subject;

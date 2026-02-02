@@ -1,8 +1,6 @@
 package com.mailProject.email.service;
 
-import com.mailProject.email.dto.SchedulerRequestDto;
 import com.mailProject.email.repository.MailSchedulerRepository;
-import com.mailProject.email.service.impl.ClickUpService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,7 +32,7 @@ public class CronScheduler {
                     cron.next(now.minusMinutes(1));
 
             if (next != null && next.equals(now)) {
-                System.out.println(" Executed: " + job.getName());
+                log.info("Executed job: {}", job.getName());
             }
         });
     }

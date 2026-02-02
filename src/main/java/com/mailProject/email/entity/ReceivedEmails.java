@@ -43,4 +43,8 @@ public class ReceivedEmails {
 
     @Column(name = "account_id")
     private Long accountId;
+
+    @Column(columnDefinition = "TEXT")
+    private String inlineImages;
+
 }

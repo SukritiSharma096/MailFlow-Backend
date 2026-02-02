@@ -3,8 +3,10 @@ package com.mailProject.email.service.impl;
 import com.mailProject.email.dto.*;
 import com.mailProject.email.entity.MultipleEmailAccounts;
 import com.mailProject.email.entity.ReceivedEmails;
+import com.mailProject.email.entity.SentMails;
 import com.mailProject.email.repository.MultipleEmailRepository;
 import com.mailProject.email.repository.ReceiveEmailRepository;
+import com.mailProject.email.repository.SentEmailRepository;
 import com.mailProject.email.service.MultipleEmailService;
 import com.sun.mail.imap.IMAPFolder;
 import jakarta.mail.*;
@@ -23,12 +25,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class MultipleEmailsServiceImpl implements MultipleEmailService {
+
+    @Autowired
+    private SentEmailRepository sentMailRepository;
+
 
     @Autowired
     private ReceiveEmailRepository receiveEmailRepository;
@@ -67,7 +74,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         }
 
         MultipleEmailAccounts e = new MultipleEmailAccounts();
-
         e.setName(request.getName());
         e.setUsername(request.getUsername());
         e.setPassword(request.getPassword().trim());
@@ -181,12 +187,11 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         }
 
         message.setSubject(request.getSubject());
-
         Multipart multipart = new MimeMultipart();
-
         MimeBodyPart bodyPart = new MimeBodyPart();
         bodyPart.setText(request.getBody());
         multipart.addBodyPart(bodyPart);
+        List<String> attachmentNames = new ArrayList<>();
 
         if (request.getAttachments() != null) {
             for (MultipartFile mf : request.getAttachments()) {
@@ -195,12 +200,26 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                     File f = convertMultipartToFile(mf);
                     filePart.attachFile(f);
                     multipart.addBodyPart(filePart);
+
+                    attachmentNames.add(mf.getOriginalFilename());
                 }
             }
         }
 
         message.setContent(multipart);
         Transport.send(message);
+        SentMails sentMail = new SentMails();
+        sentMail.setAccountId(accountId);
+        sentMail.setToEmails(String.join(",", request.getTo()));
+        sentMail.setSubject(request.getSubject());
+        sentMail.setBody(request.getBody());
+        sentMail.setSentAt(LocalDateTime.now());
+
+        if (!attachmentNames.isEmpty()) {
+            sentMail.setAttachments(String.join(",", attachmentNames));
+        }
+
+        sentMailRepository.save(sentMail);
     }
 
     private File convertMultipartToFile(MultipartFile file) throws Exception {
@@ -208,7 +227,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         file.transferTo(conv);
         return conv;
     }
-
 
     private Store createImapStore(MultipleEmailAccounts acc) throws Exception {
         Properties props = new Properties();
@@ -221,12 +239,9 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             props.put("mail.imap.ssl.enable", "true");
             props.put("mail.imap.starttls.enable", "true");
         }
-
         Session session = Session.getInstance(props);
-
         Store store = session.getStore(acc.getProtocol());
         store.connect(acc.getImapHost(), acc.getUsername(), acc.getPassword());
-
         return store;
     }
 
@@ -249,17 +264,14 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         }
 
         Message[] messages = inbox.getMessages(1, totalMessages);
-
         List<ReceiveEmailResponse> list = new ArrayList<>();
 
         for (Message msg : messages) {
-
             MimeMessage mimeMessage = (MimeMessage) msg;
             String messageId = mimeMessage.getMessageID();
             ReceivedEmails email = receiveEmailRepository
                     .findByMessageId(messageId)
                     .orElseGet(() -> {
-
                         ReceivedEmails e = new ReceivedEmails();
                         e.setMessageId(messageId);
 
@@ -269,46 +281,64 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                             e.setSubject(msg.getSubject());
                             e.setBody(getBody(msg));
                             e.setAttachments(String.join(",", getAttachments(msg)));
+                            Map<String, String> inlineImages = extractInlineImages(msg);
+                            if (!inlineImages.isEmpty()) {
+                                e.setInlineImages(
+                                        new com.fasterxml.jackson.databind.ObjectMapper()
+                                                .writeValueAsString(inlineImages)
+                                );
+                            }
                             e.setSentAt(
                                     msg.getSentDate() != null
                                             ? msg.getSentDate().toInstant()
                                             .atZone(ZoneId.systemDefault())
                                             .toLocalDateTime()
-                                            : null
-                            );
+                                            : null);
                         } catch (Exception ex) {
+                            ex.printStackTrace();
                         }
-
                         e.setReceived(true);
                         e.setFolder("INBOX");
                         e.setAccountId(accountId);
-
                         return receiveEmailRepository.save(e);
                     });
 
             ReceiveEmailResponse dto = new ReceiveEmailResponse();
             dto.setId(email.getId());
             dto.setSender(email.getSender());
-            dto.setReceiver(List.of(email.getReceivers()));
+            dto.setReceiver(
+                    email.getReceivers() != null
+                            ? List.of(email.getReceivers().split(","))
+                            : List.of()
+            );
             dto.setSubject(email.getSubject());
             dto.setBody(email.getBody());
             dto.setSentAt(email.getSentAt());
             dto.setReceived(true);
+            dto.setFolder("INBOX");
             dto.setAttachments(
                     email.getAttachments() != null
                             ? List.of(email.getAttachments().split(","))
                             : List.of()
             );
-            dto.setFolder("INBOX");
-
+            if (email.getInlineImages() != null) {
+                dto.setInlineImages(
+                        new com.fasterxml.jackson.databind.ObjectMapper()
+                                .readValue(
+                                        email.getInlineImages(),
+                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                                )
+                );
+            } else {
+                dto.setInlineImages(Map.of());
+            }
             list.add(dto);
         }
-
         inbox.close(false);
         store.close();
-
         return list;
     }
+
 
 
     private List<String> getReceivers(Message msg) throws MessagingException {
@@ -343,18 +373,17 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                 if (nested != null && !nested.isEmpty()) return nested;
             }
         }
-
         return plainText != null ? plainText : "";
     }
 
 
     private List<String> getAttachments(Message msg) throws Exception {
+
         List<String> attachments = new ArrayList<>();
 
         if (!msg.isMimeType("multipart/*")) {
             return attachments;
         }
-
         Multipart mp = (Multipart) msg.getContent();
 
         for (int i = 0; i < mp.getCount(); i++) {
@@ -363,12 +392,13 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
             String disposition = part.getDisposition();
             String filename = part.getFileName();
-
-            if (disposition == null && filename == null) {
+            if (disposition != null &&
+                    disposition.equalsIgnoreCase(MimeBodyPart.INLINE)) {
                 continue;
             }
-
-            if (filename != null) {
+            if (filename != null &&
+                    disposition != null &&
+                    disposition.equalsIgnoreCase(MimeBodyPart.ATTACHMENT)) {
 
                 attachments.add(filename);
 
@@ -385,8 +415,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         return attachments;
     }
-
-    // MOVE FILTER
 
     @Override
     public void moveGoogleMails(Long id) { moveByFilter(id, "google.com", "Google"); }
@@ -483,15 +511,36 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         ReceiveEmailResponse dto = new ReceiveEmailResponse();
         dto.setId(e.getId());
         dto.setSender(e.getSender());
-        dto.setReceiver(Arrays.asList(e.getReceivers().split(",")));
+        dto.setReceiver(
+                e.getReceivers() != null
+                        ? Arrays.asList(e.getReceivers().split(","))
+                        : List.of()
+        );
         dto.setSubject(e.getSubject());
         dto.setBody(e.getBody());
         dto.setSentAt(e.getSentAt());
         dto.setFolder(e.getFolder());
         dto.setReceived(e.isReceived());
+        dto.setAttachments(
+                e.getAttachments() != null
+                        ? Arrays.asList(e.getAttachments().split(","))
+                        : List.of()
+        );
 
-        if (e.getAttachments() != null) {
-            dto.setAttachments(Arrays.asList(e.getAttachments().split(",")));
+        if (e.getInlineImages() != null) {
+            try {
+                dto.setInlineImages(
+                        new com.fasterxml.jackson.databind.ObjectMapper()
+                                .readValue(
+                                        e.getInlineImages(),
+                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                                )
+                );
+            } catch (Exception ex) {
+                dto.setInlineImages(Map.of());
+            }
+        } else {
+            dto.setInlineImages(Map.of());
         }
 
         return dto;
@@ -526,5 +575,45 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             return dto;
         }).toList();
     }
+
+
+    private Map<String, String> extractInlineImages(Message msg) throws Exception {
+
+        Map<String, String> inlineImages = new HashMap<>();
+
+        if (!msg.isMimeType("multipart/*")) return inlineImages;
+
+        Multipart mp = (Multipart) msg.getContent();
+
+        for (int i = 0; i < mp.getCount(); i++) {
+
+            BodyPart part = mp.getBodyPart(i);
+
+            String disposition = part.getDisposition();
+            String[] cids = part.getHeader("Content-ID");
+
+            if (disposition != null
+                    && disposition.equalsIgnoreCase(MimeBodyPart.INLINE)
+                    && cids != null) {
+
+                String cid = cids[0].replace("<", "").replace(">", "");
+
+                String ext = part.getContentType().split("/")[1].split(";")[0];
+                String fileName = cid + "." + ext;
+
+                Path folder = Paths.get("email_attachments");
+                if (!Files.exists(folder)) Files.createDirectories(folder);
+
+                Path filePath = folder.resolve(fileName);
+
+                try (InputStream in = part.getInputStream()) {
+                    Files.copy(in, filePath, StandardCopyOption.REPLACE_EXISTING);
+                }
+                inlineImages.put(cid, fileName);
+            }
+        }
+        return inlineImages;
+    }
+
 
 }

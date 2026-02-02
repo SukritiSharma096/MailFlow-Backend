@@ -188,7 +188,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         message.setSubject(request.getSubject());
         Multipart multipart = new MimeMultipart();
-
         MimeBodyPart bodyPart = new MimeBodyPart();
         bodyPart.setText(request.getBody());
         multipart.addBodyPart(bodyPart);

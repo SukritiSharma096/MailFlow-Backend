@@ -106,7 +106,6 @@ public class MultipleEmailController {
         }
     }
 
-
     @GetMapping("/{accountId}/sent")
     public List<SentMails> getSentMails(@PathVariable Long accountId) {
         return sentEmailRepository.findByAccountIdOrderBySentAtDesc(accountId);
@@ -250,7 +249,6 @@ public class MultipleEmailController {
     @PostMapping("/{accountId}/sync")
     public ResponseEntity<?> manualSyncInbox(@PathVariable Long accountId) {
         try {
-            // This calls the same service method used by scheduler
             List<ReceiveEmailResponse> inbox = service.fetchInbox(accountId);
             return ResponseEntity.ok(inbox);
         } catch (Exception e) {
@@ -258,6 +256,5 @@ public class MultipleEmailController {
                     .body("Failed to sync inbox: " + e.getMessage());
         }
     }
-
 
 }

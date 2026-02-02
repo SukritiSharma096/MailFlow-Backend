@@ -27,5 +27,4 @@ public class ReceiveEmailResponse {
     private List<String> attachments;
     private String folder;
     private Map<String, String> inlineImages;
-
 }

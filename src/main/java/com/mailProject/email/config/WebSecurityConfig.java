@@ -32,7 +32,7 @@ public class WebSecurityConfig {
             "/webjars/**",
             "/api/accounts","/api/accounts", "/api/accounts/*", "/api/accounts/inbox/*", "/api/accounts/mail/attachments", "/api/accounts/inbox/db/*", "/api/accounts/inbox/fetch/**", "/api/accounts/email/**",
             "/api/accounts/*/send",
-            "/api/accounts/sendWithAttachments/**", "/api/accounts/*/sent", "/api/accounts/*/sent/**", "/api/accounts/*/sync","/api/accounts/*/delete/**","/api/accounts/*",
+            "/api/accounts/sendWithAttachments/**", "/api/accounts/*/sent", "/api/accounts/*/sent/**", "/api/accounts/*/sync","/api/accounts/*/delete/**","/api/accounts/*"
     };
 
     @Bean

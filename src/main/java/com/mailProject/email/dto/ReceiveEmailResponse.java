@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -25,5 +26,6 @@ public class ReceiveEmailResponse {
     private boolean isReceived;
     private List<String> attachments;
     private String folder;
+    private Map<String, String> inlineImages;
 
 }

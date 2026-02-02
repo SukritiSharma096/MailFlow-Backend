@@ -1,8 +1,10 @@
 package com.mailProject.email.controller;
 
 import com.mailProject.email.dto.*;
+import com.mailProject.email.entity.SentMails;
 import com.mailProject.email.repository.MultipleEmailRepository;
 import com.mailProject.email.repository.ReceiveEmailRepository;
+import com.mailProject.email.repository.SentEmailRepository;
 import com.mailProject.email.service.MultipleEmailService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.tomcat.util.http.fileupload.IOUtils;
@@ -23,6 +25,9 @@ import java.util.Map;
 @RequestMapping("/api/accounts")
 @CrossOrigin("*")
 public class MultipleEmailController {
+
+    @Autowired
+    private SentEmailRepository sentEmailRepository;
 
     @Autowired
     private MultipleEmailRepository multipleEmailRepository;
@@ -78,8 +83,6 @@ public class MultipleEmailController {
         return ResponseEntity.noContent().build();
     }
 
-
-
     @PostMapping("/{id}/send")
     public ResponseEntity<String> send(@PathVariable Long id, @RequestBody SendEmailRequest req) {
         try {
@@ -104,6 +107,19 @@ public class MultipleEmailController {
     }
 
 
+    @GetMapping("/{accountId}/sent")
+    public List<SentMails> getSentMails(@PathVariable Long accountId) {
+        return sentEmailRepository.findByAccountIdOrderBySentAtDesc(accountId);
+    }
+
+    @GetMapping("/{accountId}/sent/{mailId}")
+    public SentMails getSentMailById(
+            @PathVariable Long accountId,
+            @PathVariable Long mailId) {
+
+        return sentEmailRepository.findById(mailId)
+                .orElseThrow(() -> new RuntimeException("Sent mail not found"));
+    }
 
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -230,5 +246,18 @@ public class MultipleEmailController {
                     .body("Failed to fetch inbox: " + e.getMessage());
         }
     }
+
+    @PostMapping("/{accountId}/sync")
+    public ResponseEntity<?> manualSyncInbox(@PathVariable Long accountId) {
+        try {
+            // This calls the same service method used by scheduler
+            List<ReceiveEmailResponse> inbox = service.fetchInbox(accountId);
+            return ResponseEntity.ok(inbox);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("Failed to sync inbox: " + e.getMessage());
+        }
+    }
+
 
 }

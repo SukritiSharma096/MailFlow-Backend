@@ -257,4 +257,27 @@ public class MultipleEmailController {
         }
     }
 
+
+    @PostMapping("/{accountId}/forward/{emailId}")
+    public ResponseEntity<?> forwardMail(
+            @PathVariable Long accountId,
+            @PathVariable Long emailId,
+            @RequestBody List<String> to
+    ) throws Exception {
+
+        service.forwardEmail(accountId, emailId, to);
+        return ResponseEntity.ok("Mail forwarded successfully");
+    }
+
+    @DeleteMapping("/{accountId}/sent/delete/{emailId}")
+    public ResponseEntity<String> deleteSentEmail(
+            @PathVariable Long accountId,
+            @PathVariable Long emailId) {
+
+        service.deleteSentEmailFromDb(accountId, emailId);
+        return ResponseEntity.ok(
+                "Sent email with ID " + emailId + " deleted successfully from account " + accountId
+        );
+    }
+
 }

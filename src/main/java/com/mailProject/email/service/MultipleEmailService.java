@@ -25,5 +25,7 @@ public interface MultipleEmailService {
     boolean verifyPassword(String username, String password);
     ReceiveEmailResponse getEmailById(Long id);
     List<ReceiveEmailResponse> getInboxFromDb(Long accountId, String folder);
+    void forwardEmail(Long accountId, Long emailId, List<String> to) throws Exception;
+    boolean deleteSentEmailFromDb(Long accountId, Long emailId);
 
 }

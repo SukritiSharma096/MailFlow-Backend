@@ -481,12 +481,47 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
     public boolean deleteEmailFromDb(Long accountId, Long emailId) {
         ReceivedEmails email = receiveEmailRepository
                 .findByIdAndAccountId(emailId, accountId)
-                .orElseThrow(() -> new RuntimeException(
-                        "Email not found with ID: " + emailId + " for Account ID: " + accountId
-                ));
+                .orElseThrow(() -> new RuntimeException("Email not found with ID: " + emailId));
+        MultipleEmailAccounts account = multipleEmailRepository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("Account not found"));
 
-        receiveEmailRepository.delete(email);
-        return true;
+        try {
+            Properties props = new Properties();
+            props.put("mail.store.protocol", account.getProtocol());
+            props.put("mail.imap.host", account.getImapHost());
+            props.put("mail.imap.port", account.getImapPort());
+
+            if (Boolean.TRUE.equals(account.getImapSsl())) {
+                props.put("mail.imap.ssl.enable", "true");
+            }
+
+            Session session = Session.getInstance(props);
+            Store store = session.getStore(account.getProtocol());
+            store.connect(account.getImapHost(), account.getUsername(), account.getPassword());
+            Folder inbox = store.getFolder(email.getFolder() != null ? email.getFolder() : "INBOX");
+            inbox.open(Folder.READ_WRITE);
+
+            Message[] messages = inbox.getMessages();
+            for (Message msg : messages) {
+                MimeMessage mm = (MimeMessage) msg;
+
+                if (mm.getMessageID() != null &&
+                        mm.getMessageID().equals(email.getMessageId())) {
+
+                    msg.setFlag(Flags.Flag.DELETED, true);
+                    break;
+                }
+            }
+
+            inbox.close(true);
+            store.close();
+            receiveEmailRepository.delete(email);
+
+            return true;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete email from server", e);
+        }
     }
 
 
@@ -615,5 +650,63 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         return inlineImages;
     }
 
+    @Override
+    public void forwardEmail(
+            Long accountId,
+            Long emailId,
+            List<String> to
+    ) throws Exception {
+
+        MultipleEmailAccounts acc = multipleEmailRepository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("Account not found"));
+
+        ReceivedEmails email = receiveEmailRepository
+                .findByIdAndAccountId(emailId, accountId)
+                .orElseThrow(() -> new RuntimeException("Email not found"));
+
+        Store store = createImapStore(acc);
+        Folder inbox = store.getFolder(email.getFolder());
+        inbox.open(Folder.READ_ONLY);
+
+        for (Message msg : inbox.getMessages()) {
+            MimeMessage original = (MimeMessage) msg;
+
+            if (email.getMessageId().equals(original.getMessageID())) {
+
+                Session smtpSession = createSmtpSession(acc);
+
+                MimeMessage forward = new MimeMessage(smtpSession);
+                forward.setFrom(new InternetAddress(acc.getUsername()));
+
+                for (String r : to) {
+                    forward.addRecipient(Message.RecipientType.TO, new InternetAddress(r));
+                }
+                forward.setSubject("Fwd: " + original.getSubject());
+                forward.setContent(original.getContent(), original.getContentType());
+                Transport.send(forward);
+                break;
+            }
+        }
+
+        inbox.close(false);
+        store.close();
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteSentEmailFromDb(Long accountId, Long emailId) {
+
+        SentMails sentMail = sentMailRepository
+                .findById(emailId)
+                .orElseThrow(() -> new RuntimeException("Sent email not found with ID: " + emailId));
+
+        if (!sentMail.getAccountId().equals(accountId)) {
+            throw new RuntimeException("Sent email does not belong to this account");
+        }
+
+        sentMailRepository.delete(sentMail);
+
+        return true;
+    }
 
 }

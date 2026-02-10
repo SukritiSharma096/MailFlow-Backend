@@ -31,6 +31,9 @@ public class WebSecurityConfig {
             "/v3/api-docs",
             "/swagger-resources/**",
             "/webjars/**",
+            "/api/accounts","/api/accounts", "/api/accounts/*", "/api/accounts/inbox/*", "/api/accounts/mail/attachments", "/api/accounts/inbox/db/*", "/api/accounts/inbox/fetch/**", "/api/accounts/email/**",
+            "/api/accounts/*/send",
+            "/api/accounts/sendWithAttachments/**", "/api/accounts/*/sent", "/api/accounts/*/sent/**", "/api/accounts/*/sync","/api/accounts/*/delete/**","/api/accounts/*/forward/**","/api/accounts/*/sent/delete/**",
             "/api/accounts","/api/accounts", "/api/accounts/*", "/api/accounts/inbox/*", "/api/accounts/mail/attachments", "/api/accounts/inbox/db/*", "/api/accounts/inbox/fetch/**", "/api/accounts/email/**","/api/schedulers/**"
     };
 

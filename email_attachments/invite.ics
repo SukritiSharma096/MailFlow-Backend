@@ -1,0 +1,41 @@
+BEGIN:VCALENDAR
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+VERSION:2.0
+CALSCALE:GREGORIAN
+METHOD:CANCEL
+BEGIN:VEVENT
+DTSTART:20250213T100000Z
+DTEND:20250213T103000Z
+DTSTAMP:20250213T100822Z
+ORGANIZER;CN=Dinesh Bansal:mailto:hrops@ldttechnology.com
+UID:34mh15qcm9rr1n86fe61djbd0u@google.com
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=Dinesh
+  Bansal;X-NUM-GUESTS=0:mailto:hrops@ldttechnology.com
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;CN=Gu
+ rsheen Kaur;X-NUM-GUESTS=0:mailto:hr@ldttechnology.com
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=b82481
+ 27@gmail.com;X-NUM-GUESTS=0:mailto:b8248127@gmail.com
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;CN=Pr
+ adeep Kumar;X-NUM-GUESTS=0:mailto:pk@ldttechnology.com
+X-GOOGLE-CONFERENCE:https://meet.google.com/gqq-bmbt-fui
+CREATED:20250211T124959Z
+DESCRIPTION:-::~:~::~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~
+ :~:~:~:~:~:~:~:~::~:~::-\nJoin with Google Meet: https://meet.google.com/gq
+ q-bmbt-fui\nOr dial: (US) +1 567-228-0053 PIN: 164777341#\nMore phone numbe
+ rs: https://tel.meet/gqq-bmbt-fui?pin=2349382860971&hs=7\n\nLearn more abou
+ t Meet at: https://support.google.com/a/users/answer/9282720\n\nPlease do n
+ ot edit this section.\n-::~:~::~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:
+ ~:~:~:~:~:~:~:~:~:~:~:~:~:~::~:~::-
+LAST-MODIFIED:20250213T100821Z
+LOCATION:
+SEQUENCE:5
+STATUS:CANCELLED
+SUMMARY:L1 Technical_5.7 Years_Java_Baljinder singh
+TRANSP:OPAQUE
+ATTACH;FILENAME=Job Description Senior Java Developer.docx;FMTTYPE=applicat
+ ion/vnd.openxmlformats-officedocument.wordprocessingml.document:https://dri
+ ve.google.com/open?id=1nfVjT2hhzsn2dAnLqE9rOlBeQLpXKQDO
+ATTACH;FILENAME=baljinder cv updated.pdf;FMTTYPE=application/pdf:https://dr
+ ive.google.com/open?id=1k0i7nRAVjJ-3Y3VSCF8FEabwh1qZ0LEo
+END:VEVENT
+END:VCALENDAR

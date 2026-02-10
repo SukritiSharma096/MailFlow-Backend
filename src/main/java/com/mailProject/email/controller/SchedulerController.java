@@ -39,8 +39,9 @@ public class SchedulerController {
         return ResponseEntity.ok(service.update(id, dto));
     }
     @PutMapping("/{id}/toggle-status")
-    public SchedulerResponseDto toggleStatus(@PathVariable Long id, boolean status) {
-        return service.toggleStatus(id, status);
+    public ResponseEntity<SchedulerResponseDto> toggleStatus(@PathVariable Long id) {
+        SchedulerResponseDto response = service.toggleStatus(id);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")

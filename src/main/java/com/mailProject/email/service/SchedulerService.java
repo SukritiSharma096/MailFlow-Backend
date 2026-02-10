@@ -7,6 +7,7 @@ import com.mailProject.email.repository.MailSchedulerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
@@ -52,13 +53,22 @@ public class SchedulerService {
     public void delete(Long id) {
         repository.deleteById(id);
     }
-    public SchedulerResponseDto toggleStatus(Long id, boolean status) {
-        MailScheduler entity = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Scheduler not found"));
+    @Transactional
+    public SchedulerResponseDto toggleStatus(Long id) {
+        List<MailScheduler> allSchedulers = repository.findAll();
 
-        entity.setStatus(!entity.getStatus());
+        for (MailScheduler s : allSchedulers) {
+            if (s.getId().equals(id)) {
+                s.setStatus(!s.getStatus());
+            } else {
+                s.setStatus(false);
+            }
+        }
 
-        MailScheduler updated = repository.save(entity);
+        repository.saveAll(allSchedulers);
+
+        MailScheduler updated = repository.findById(id).orElseThrow(() ->
+                new RuntimeException("Scheduler not found"));
         return mapToResponse(updated);
     }
 
@@ -68,7 +78,7 @@ public class SchedulerService {
         dto.setName(e.getName());
         dto.setCronExpression(e.getCronExpression());
         dto.setDescription(e.getDescription());
-        dto.setStatus(e.getStatus());
+        dto.setStatus(e.getStatus() != null && e.getStatus());
         return dto;
     }
 }

@@ -1,5 +1,6 @@
 package com.mailProject.email.entity;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Entity
@@ -15,5 +16,6 @@ public class MailScheduler {
     @Column(name = "cron_expression")
     private String cronExpression;
     private String description;
+    @NotNull
     private Boolean status;
 }

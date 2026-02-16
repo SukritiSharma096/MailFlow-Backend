@@ -43,6 +43,11 @@ public class SchedulerController {
         SchedulerResponseDto response = service.toggleStatus(id);
         return ResponseEntity.ok(response);
     }
+    @PutMapping("/restart")
+    public ResponseEntity<String> restartScheduler() {
+        service.startEnabledScheduler();
+        return ResponseEntity.ok("Scheduler restarted successfully");
+    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<String> delete(@PathVariable Long id) {

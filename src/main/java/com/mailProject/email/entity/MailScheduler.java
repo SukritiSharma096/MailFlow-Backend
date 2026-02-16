@@ -13,7 +13,7 @@ public class MailScheduler {
     private Long id;
     private String name;
 
-    @Column(name = "cron_expression")
+    @Column(name = "cron_expression, nullable = false")
     private String cronExpression;
     private String description;
     @NotNull

@@ -257,7 +257,6 @@ public class MultipleEmailController {
         }
     }
 
-
     @PostMapping("/{accountId}/forward/{emailId}")
     public ResponseEntity<?> forwardMail(
             @PathVariable Long accountId,
@@ -278,6 +277,16 @@ public class MultipleEmailController {
         return ResponseEntity.ok(
                 "Sent email with ID " + emailId + " deleted successfully from account " + accountId
         );
+    }
+
+    @GetMapping("/inbox/all")
+    public ResponseEntity<?> fetchAllAccountsInbox() {
+        try {
+            return ResponseEntity.ok(service.fetchAllAccountsInbox());
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("Failed to fetch all inboxes: " + e.getMessage());
+        }
     }
 
 }

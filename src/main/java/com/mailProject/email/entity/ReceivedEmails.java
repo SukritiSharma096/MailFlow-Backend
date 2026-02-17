@@ -47,4 +47,7 @@ public class ReceivedEmails {
     @Column(columnDefinition = "TEXT")
     private String inlineImages;
 
+    @Column(name = "task_created")
+    private Boolean taskCreated = false;
+
 }

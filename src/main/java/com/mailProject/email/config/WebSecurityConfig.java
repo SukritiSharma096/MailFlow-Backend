@@ -1,6 +1,5 @@
 package com.mailProject.email.config;
 
-import com.mailProject.email.security.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +12,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import com.mailProject.email.security.JwtAuthFilter;
 
 @Configuration
 @EnableMethodSecurity
@@ -30,9 +31,16 @@ public class WebSecurityConfig {
             "/v3/api-docs",
             "/swagger-resources/**",
             "/webjars/**",
-            "/api/accounts","/api/accounts", "/api/accounts/*", "/api/accounts/inbox/*", "/api/accounts/mail/attachments", "/api/accounts/inbox/db/*", "/api/accounts/inbox/fetch/**", "/api/accounts/email/**",
+            "/api/accounts","/api/accounts", "/api/accounts/*", "/api/accounts/inbox/*", "/api/accounts/mail/attachments", "/api/accounts/inbox/db/*", "/api/accounts/inbox/fetch/**", "/api/accounts/email/**","/api/schedulers/**",
             "/api/accounts/*/send",
-            "/api/accounts/sendWithAttachments/**", "/api/accounts/*/sent", "/api/accounts/*/sent/**", "/api/accounts/*/sync","/api/accounts/*/delete/**","/api/accounts/*/forward/**","/api/accounts/*/sent/delete/**"
+            "/api/accounts/sendWithAttachments/**", "/api/accounts/*/sent", "/api/accounts/*/sent/**", "/api/accounts/*/sync","/api/accounts/*/delete/**","/api/accounts/*/forward/**","/api/accounts/*/sent/delete/**",
+            "/api/jobs/run","/api/jobs/latest","/api/jobs/history",
+            "/api/schedulers/save",
+            "/api/schedulers/all",
+            "/api/schedulers/*",
+            "/api/schedulers/*/toggle-status",
+            "/api/schedulers/restart",
+            "/api/accounts/inbox/all"
     };
 
     @Bean

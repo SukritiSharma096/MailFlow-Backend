@@ -31,9 +31,7 @@ public class AdminController {
 
         boolean valid = adminService.verifyAdmin(
                 request.getUsername(),
-                request.getPassword()
-        );
-
+                request.getPassword());
         if (!valid) {
             return ResponseEntity
                     .status(401)
@@ -42,7 +40,6 @@ public class AdminController {
 
         AdminResponse admin =
                 adminService.getAdminByUsername(request.getUsername());
-
         String token = jwtUtil.generateToken(
                 admin.getUsername(),
                 admin.getRole()

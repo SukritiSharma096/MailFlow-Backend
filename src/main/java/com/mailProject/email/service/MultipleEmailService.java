@@ -27,5 +27,6 @@ public interface MultipleEmailService {
     List<ReceiveEmailResponse> getInboxFromDb(Long accountId, String folder);
     void forwardEmail(Long accountId, Long emailId, List<String> to) throws Exception;
     boolean deleteSentEmailFromDb(Long accountId, Long emailId);
+    List<ReceiveEmailResponse> fetchAllAccountsInbox();
 
 }

@@ -709,4 +709,27 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         return true;
     }
 
+
+    @Override
+    public List<ReceiveEmailResponse> fetchAllAccountsInbox() {
+
+        List<MultipleEmailAccounts> activeAccounts =
+                multipleEmailRepository.findByActiveTrue();
+
+        return activeAccounts
+                .parallelStream()
+                .flatMap(account -> {
+                    try {
+                        return fetchInbox(account.getId()).stream();
+                    } catch (Exception e) {
+                        System.err.println("Failed for account: "
+                                + account.getUsername() + " " + e.getMessage());
+                        return List.<ReceiveEmailResponse>of().stream();
+                    }
+                })
+                .sorted(Comparator.comparing(ReceiveEmailResponse::getSentAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
 }

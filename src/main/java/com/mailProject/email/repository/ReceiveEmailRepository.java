@@ -3,6 +3,7 @@ package com.mailProject.email.repository;
 import com.mailProject.email.entity.ReceivedEmails;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,5 +17,6 @@ public interface ReceiveEmailRepository extends JpaRepository<ReceivedEmails, Lo
 
     List<ReceivedEmails> findTop20ByAccountIdAndFolderOrderBySentAtDesc(Long accountId, String folder);
 
+    List<ReceivedEmails> findByAccountIdAndTaskCreatedFalse(Long accountId);
 
 }

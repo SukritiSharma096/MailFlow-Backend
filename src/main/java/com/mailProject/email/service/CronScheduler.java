@@ -1,6 +1,7 @@
 package com.mailProject.email.service;
 
 import com.mailProject.email.repository.MailSchedulerRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -9,12 +10,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
-@Slf4j
+@RequiredArgsConstructor
 @Component
-
 public class CronScheduler {
-    @Autowired
-    private MailSchedulerRepository repository;
+
+    private final MailSchedulerRepository repository;
+    private final MailJobService mailJobService;
 
     @Scheduled(cron = "0 * * * * *")
     public void checkAndRun() {
@@ -23,7 +24,8 @@ public class CronScheduler {
 
         repository.findAll().forEach(job -> {
 
-            if (!"ENABLED".equals(job.getStatus())) return;
+
+            if (!Boolean.TRUE.equals(job.getStatus())) return;
 
             CronExpression cron =
                     CronExpression.parse(job.getCronExpression());
@@ -32,7 +34,9 @@ public class CronScheduler {
                     cron.next(now.minusMinutes(1));
 
             if (next != null && next.equals(now)) {
-                log.info("Executed job: {}", job.getName());
+
+                mailJobService.runJob(job.getName());
+
             }
         });
     }

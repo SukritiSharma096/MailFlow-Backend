@@ -24,7 +24,8 @@ public class SchedulerService {
     private TaskScheduler taskScheduler;
 
     @Autowired
-    private ClickUpService clickUpService;
+    private MailJobService mailJobService;
+
 
     private ScheduledFuture<?> scheduledTask;
 
@@ -67,8 +68,10 @@ public class SchedulerService {
 
     private void executeTask(Long schedulerId) {
         System.out.println("Running scheduler ID: " + schedulerId);
-        clickUpService.pushEmailsToClickUp(schedulerId);
+        mailJobService.runJob("SCHEDULER");
     }
+
+
 
     public SchedulerResponseDto create(SchedulerRequestDto dto) {
 

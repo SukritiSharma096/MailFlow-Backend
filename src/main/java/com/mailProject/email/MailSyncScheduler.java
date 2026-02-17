@@ -30,13 +30,10 @@ public class MailSyncScheduler {
 
         for (MultipleEmailAccounts acc : accounts) {
             try {
-                multipleEmailService.fetchInbox(acc.getId());
+                multipleEmailService.fetchAllAccountsInbox();
+                System.out.println("All accounts synced successfully");
             } catch (Exception e) {
-                System.err.println(
-                        "Mail sync failed for account "
-                                + acc.getUsername()
-                                + " : " + e.getMessage()
-                );
+                System.err.println("Global mail sync failed: " + e.getMessage());
             }
         }
     }

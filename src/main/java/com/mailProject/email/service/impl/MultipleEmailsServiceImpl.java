@@ -73,6 +73,12 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             throw new RuntimeException("Username already exists!");
         }
 
+        if (!validateImapCredentials(request.getUsername(), request.getPassword(),
+                request.getImapHost(), request.getImapPort(), request.getProtocol(),
+                request.getImapSsl() == null ? true : request.getImapSsl())) {
+            throw new RuntimeException("Invalid email or app password");
+        }
+
         MultipleEmailAccounts e = new MultipleEmailAccounts();
         e.setName(request.getName());
         e.setUsername(request.getUsername());
@@ -87,6 +93,33 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         e.setActive(request.getActive());
         e = multipleEmailRepository.save(e);
         return toResponse(e);
+    }
+
+    private boolean validateImapCredentials(String username, String password,
+                                            String imapHost, Integer imapPort,
+                                            String protocol, Boolean imapSsl) {
+        try {
+            Properties props = new Properties();
+            props.put("mail.store.protocol", protocol);
+            props.put("mail.imap.host", imapHost);
+            props.put("mail.imap.port", imapPort);
+
+            if (Boolean.TRUE.equals(imapSsl)) {
+                props.put("mail.imap.ssl.enable", "true");
+                props.put("mail.imap.starttls.enable", "true");
+            }
+
+            Session session = Session.getInstance(props);
+            Store store = session.getStore(protocol);
+            store.connect(imapHost, username, password);
+            store.close();
+
+            return true;
+        } catch (AuthenticationFailedException e) {
+            return false;
+        } catch (Exception e) {
+            throw new RuntimeException("Error verifying email credentials: " + e.getMessage());
+        }
     }
 
 
@@ -113,8 +146,16 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         e.setName(request.getName());
         e.setUsername(request.getUsername());
         if (request.getPassword() != null && StringUtils.hasText(request.getPassword())) {
+
+            if (!validateImapCredentials(request.getUsername(), request.getPassword(),
+                    request.getImapHost(), request.getImapPort(), request.getProtocol(),
+                    request.getImapSsl() == null ? true : request.getImapSsl())) {
+                throw new RuntimeException("Invalid email or app password");
+            }
+
             e.setPassword(request.getPassword().trim());
         }
+
         e.setSmtpHost(request.getSmtpHost());
         e.setSmtpPort(request.getSmtpPort());
         e.setImapHost(request.getImapHost());
@@ -196,15 +237,25 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         if (request.getAttachments() != null) {
             for (MultipartFile mf : request.getAttachments()) {
                 if (!mf.isEmpty()) {
-                    MimeBodyPart filePart = new MimeBodyPart();
-                    File f = convertMultipartToFile(mf);
-                    filePart.attachFile(f);
-                    multipart.addBodyPart(filePart);
 
-                    attachmentNames.add(mf.getOriginalFilename());
+                    Path folder = Paths.get("email_attachments");
+                    if (!Files.exists(folder)) {
+                        Files.createDirectories(folder);
+                    }
+
+                    String fileName = System.currentTimeMillis() + "_" + mf.getOriginalFilename();
+                    Path filePath = folder.resolve(fileName);
+
+                    Files.copy(mf.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+                    MimeBodyPart filePart = new MimeBodyPart();
+                    filePart.attachFile(filePath.toFile());
+                    multipart.addBodyPart(filePart);
+                    attachmentNames.add(fileName);
                 }
             }
         }
+
 
         message.setContent(multipart);
         Transport.send(message);
@@ -326,7 +377,8 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                         new com.fasterxml.jackson.databind.ObjectMapper()
                                 .readValue(
                                         email.getInlineImages(),
-                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {
+                                        }
                                 )
                 );
             } else {
@@ -338,7 +390,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         store.close();
         return list;
     }
-
 
 
     private List<String> getReceivers(Message msg) throws MessagingException {
@@ -417,17 +468,34 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
     }
 
     @Override
-    public void moveGoogleMails(Long id) { moveByFilter(id, "google.com", "Google"); }
+    public void moveGoogleMails(Long id) {
+        moveByFilter(id, "google.com", "Google");
+    }
+
     @Override
-    public void moveYouTubeMails(Long id) { moveByFilter(id, "youtube.com", "YouTube"); }
+    public void moveYouTubeMails(Long id) {
+        moveByFilter(id, "youtube.com", "YouTube");
+    }
+
     @Override
-    public void moveNetflixMails(Long id) { moveByFilter(id, "netflix.com", "Netflix"); }
+    public void moveNetflixMails(Long id) {
+        moveByFilter(id, "netflix.com", "Netflix");
+    }
+
     @Override
-    public void movePokemonGoMails(Long id) { moveByFilter(id, "email.nianticlabs.com", "PokemonGo"); }
+    public void movePokemonGoMails(Long id) {
+        moveByFilter(id, "email.nianticlabs.com", "PokemonGo");
+    }
+
     @Override
-    public void moveHDFCBankMails(Long id){ moveByFilter(id, "mailers.hdfcbank.net", "HDFC"); }
+    public void moveHDFCBankMails(Long id) {
+        moveByFilter(id, "mailers.hdfcbank.net", "HDFC");
+    }
+
     @Override
-    public void moveLinkedInMails(Long id){ moveByFilter(id, "linkedin.com", "LinkedIn"); }
+    public void moveLinkedInMails(Long id) {
+        moveByFilter(id, "linkedin.com", "LinkedIn");
+    }
 
 
     private void moveByFilter(Long accountId, String domain, String label) {
@@ -568,7 +636,8 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                         new com.fasterxml.jackson.databind.ObjectMapper()
                                 .readValue(
                                         e.getInlineImages(),
-                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {
+                                        }
                                 )
                 );
             } catch (Exception ex) {
@@ -664,32 +733,76 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                 .findByIdAndAccountId(emailId, accountId)
                 .orElseThrow(() -> new RuntimeException("Email not found"));
 
-        Store store = createImapStore(acc);
-        Folder inbox = store.getFolder(email.getFolder());
-        inbox.open(Folder.READ_ONLY);
+        Session smtpSession = createSmtpSession(acc);
 
-        for (Message msg : inbox.getMessages()) {
-            MimeMessage original = (MimeMessage) msg;
+        MimeMessage forward = new MimeMessage(smtpSession);
+        forward.setFrom(new InternetAddress(acc.getUsername()));
 
-            if (email.getMessageId().equals(original.getMessageID())) {
+        for (String r : to) {
+            forward.addRecipient(Message.RecipientType.TO, new InternetAddress(r));
+        }
 
-                Session smtpSession = createSmtpSession(acc);
+        forward.setSubject("Fwd: " + email.getSubject());
+        MimeMultipart multipart = new MimeMultipart("related");
+        MimeBodyPart bodyPart = new MimeBodyPart();
+        bodyPart.setContent(email.getBody(), "text/html; charset=UTF-8");
+        multipart.addBodyPart(bodyPart);
 
-                MimeMessage forward = new MimeMessage(smtpSession);
-                forward.setFrom(new InternetAddress(acc.getUsername()));
+        Path folder = Paths.get("email_attachments");
+        if (email.getAttachments() != null && !email.getAttachments().isBlank()) {
 
-                for (String r : to) {
-                    forward.addRecipient(Message.RecipientType.TO, new InternetAddress(r));
+            String[] files = email.getAttachments().split(",");
+
+            for (String fileName : files) {
+
+                File file = folder.resolve(fileName.trim()).toFile();
+
+                if (file.exists()) {
+                    MimeBodyPart attachmentPart = new MimeBodyPart();
+                    attachmentPart.attachFile(file);
+                    attachmentPart.setFileName(fileName.trim());
+                    multipart.addBodyPart(attachmentPart);
                 }
-                forward.setSubject("Fwd: " + original.getSubject());
-                forward.setContent(original.getContent(), original.getContentType());
-                Transport.send(forward);
-                break;
+            }
+        }
+        if (email.getInlineImages() != null) {
+
+            Map<String, String> inlineMap =
+                    new com.fasterxml.jackson.databind.ObjectMapper()
+                            .readValue(email.getInlineImages(),
+                                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
+
+            for (Map.Entry<String, String> entry : inlineMap.entrySet()) {
+
+                String cid = entry.getKey();
+                String fileName = entry.getValue();
+
+                File file = folder.resolve(fileName).toFile();
+
+                if (file.exists()) {
+
+                    MimeBodyPart inlinePart = new MimeBodyPart();
+                    inlinePart.attachFile(file);
+
+                    inlinePart.setHeader("Content-ID", "<" + cid + ">");
+                    inlinePart.setDisposition(MimeBodyPart.INLINE);
+
+                    multipart.addBodyPart(inlinePart);
+                }
             }
         }
 
-        inbox.close(false);
-        store.close();
+        forward.setContent(multipart);
+
+        Transport.send(forward);
+
+        SentMails sentMail = new SentMails();
+        sentMail.setAccountId(accountId);
+        sentMail.setToEmails(String.join(",", to));
+        sentMail.setSubject("Fwd: " + email.getSubject());
+        sentMail.setBody(email.getBody());
+        sentMail.setSentAt(LocalDateTime.now());
+        sentMailRepository.save(sentMail);
     }
 
     @Override

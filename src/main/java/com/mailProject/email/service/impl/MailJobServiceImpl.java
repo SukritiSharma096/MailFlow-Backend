@@ -9,6 +9,7 @@ import com.mailProject.email.service.MailJobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,46 +23,47 @@ public class MailJobServiceImpl implements MailJobService {
     private final MailJobHistoryRepository historyRepo;
     private final MultipleEmailRepository accountRepo;
 
-
     @Override
+    @Transactional
     public void runJob(String runType) {
-
         MailJobHistory history = new MailJobHistory();
         history.setRunType(runType);
         history.setStartTime(LocalDateTime.now());
 
-        try {
+        int totalTasks = 0;
+        boolean anyFailure = false;
 
-            List<MultipleEmailAccounts> accounts = accountRepo.findByActiveTrue();
+        List<MultipleEmailAccounts> accounts = accountRepo.findByActiveTrue();
 
-            // Parallel processing of accounts
-            int totalTasks = accounts.parallelStream()
-                    .mapToInt(account -> {
-                        try {
-                            return processingService.processNewMails(account.getId());
-                        } catch (Exception e) {
-                            log.error("Failed processing account {}: {}", account.getUsername(), e.getMessage(), e);
-                            return 0;
-                        }
-                    })
-                    .sum();
+        for (MultipleEmailAccounts account : accounts) {
+            try {
+                totalTasks += processingService.processNewMails(account.getId());
+            } catch (Exception e) {
+                log.error("Account {} processing failed: {}", account.getUsername(), e.getMessage());
+                anyFailure = true;
+            }
+        }
 
-            history.setMailCount(totalTasks);
-            history.setTaskCreated(totalTasks);
+        // ✅ Only after all accounts processed
+        history.setMailCount(totalTasks);
+        history.setTaskCreated(totalTasks);
+        if (totalTasks > 0 && !anyFailure) {
             history.setStatus("SUCCESS");
-
-        } catch (Exception e) {
-            history.setStatus("FAILED");
-            history.setErrorMessage(e.getMessage());
+        } else if (totalTasks > 0) {
+            history.setStatus("PARTIAL_SUCCESS");
+        } else {
+            history.setStatus("NO_NEW_MAILS");
         }
 
         history.setEndTime(LocalDateTime.now());
-        historyRepo.save(history);
+
+        historyRepo.save(history); // commit after everything
     }
+
+
 
     @Override
     public MailJobHistoryResponseDto getLatest() {
-
         return historyRepo
                 .findTopByOrderByStartTimeDesc()
                 .map(this::mapToDto)
@@ -70,7 +72,6 @@ public class MailJobServiceImpl implements MailJobService {
 
     @Override
     public List<MailJobHistoryResponseDto> getHistory() {
-
         return historyRepo.findAll()
                 .stream()
                 .map(this::mapToDto)
@@ -78,7 +79,6 @@ public class MailJobServiceImpl implements MailJobService {
     }
 
     private MailJobHistoryResponseDto mapToDto(MailJobHistory history) {
-
         return new MailJobHistoryResponseDto(
                 history.getId(),
                 history.getRunType(),

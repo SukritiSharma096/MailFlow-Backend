@@ -79,6 +79,7 @@ public class MailProcessingService {
                     cleanBody = cleanBody.substring(0, 3000);
                 }
                 String description =
+                        "📩 Account ID: " + accountId + "\n" +
                         "📩 Sender: " + mail.getSender() + "\n" +
                                 "🕒 Date: " + mail.getSentAt() + "\n\n" +
                                 "----------------------------------\n\n" +

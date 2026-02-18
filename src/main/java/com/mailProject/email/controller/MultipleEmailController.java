@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -96,15 +98,25 @@ public class MultipleEmailController {
     @PostMapping(value = "/sendWithAttachments/{accountId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> sendEmailWithAttachments(
             @PathVariable Long accountId,
-            @ModelAttribute SendEmailRequest request) {
-
+            @RequestParam("to") List<String> to,
+            @RequestParam("subject") String subject,
+            @RequestParam("body") String body,
+            @RequestParam(value = "attachments", required = false) List<MultipartFile> attachments
+    ) {
         try {
+            SendEmailRequest request = new SendEmailRequest();
+            request.setTo(to);
+            request.setSubject(subject);
+            request.setBody(body);
+            request.setAttachments(attachments);
             service.sendEmailWithAttachments(accountId, request);
-            return ResponseEntity.ok("Email sent successfully with multiple attachments!");
+            return ResponseEntity.ok("Email sent successfully with attachments!");
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).body("Failed: " + e.getMessage());
         }
     }
+
 
     @GetMapping("/{accountId}/sent")
     public List<SentMails> getSentMails(@PathVariable Long accountId) {

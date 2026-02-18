@@ -106,23 +106,38 @@ public class SchedulerService {
 
         return mapToResponse(repository.save(entity));
     }
+
+
     @Transactional
     public SchedulerResponseDto toggleStatus(Long id) {
-        List<MailScheduler> allSchedulers = repository.findAll();
 
-        for (MailScheduler s : allSchedulers) {
-            s.setStatus(s.getId().equals(id));
+        MailScheduler selected = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Scheduler not found"));
+
+        // If already active → turn OFF
+        if (Boolean.TRUE.equals(selected.getStatus())) {
+
+            selected.setStatus(false);
+            repository.save(selected);
+
+        } else {
+            // Turn all OFF first
+            List<MailScheduler> all = repository.findAll();
+            for (MailScheduler s : all) {
+                s.setStatus(false);
+            }
+            repository.saveAll(all);
+
+            // Turn selected ON
+            selected.setStatus(true);
+            repository.save(selected);
         }
-
-        repository.saveAll(allSchedulers);
 
         startEnabledScheduler();
 
-        return mapToResponse(
-                repository.findById(id)
-                        .orElseThrow(() -> new RuntimeException("Scheduler not found"))
-        );
+        return mapToResponse(selected);
     }
+
 
     public void delete(Long id) {
         repository.deleteById(id);

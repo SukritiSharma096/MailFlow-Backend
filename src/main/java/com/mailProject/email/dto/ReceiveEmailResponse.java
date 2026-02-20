@@ -17,6 +17,7 @@ import java.util.Map;
 public class ReceiveEmailResponse {
 
     private Long id;
+    private Long accountId;
     private String sender;
     private List<String> receiver;
     private String subject;

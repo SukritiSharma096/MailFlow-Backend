@@ -355,6 +355,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                     });
 
             ReceiveEmailResponse dto = new ReceiveEmailResponse();
+            dto.setAccountId(email.getAccountId());
             dto.setId(email.getId());
             dto.setSender(email.getSender());
             dto.setReceiver(
@@ -619,6 +620,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                         ? Arrays.asList(e.getReceivers().split(","))
                         : List.of()
         );
+        dto.setAccountId(e.getAccountId());
         dto.setSubject(e.getSubject());
         dto.setBody(e.getBody());
         dto.setSentAt(e.getSentAt());
@@ -830,10 +832,12 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                 multipleEmailRepository.findByActiveTrue();
 
         return activeAccounts
-                .parallelStream()
+                .stream()   // 👈 parallel hata do, better rahega
                 .flatMap(account -> {
                     try {
-                        return fetchInbox(account.getId()).stream();
+                        return fetchInbox(account.getId())
+                                .stream()
+                                .peek(dto -> dto.setAccountId(account.getId())); // 👈 yaha
                     } catch (Exception e) {
                         System.err.println("Failed for account: "
                                 + account.getUsername() + " " + e.getMessage());

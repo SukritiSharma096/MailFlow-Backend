@@ -740,8 +740,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             Long emailId,
             List<String> to
     ) throws Exception {
-
-        // 🔹 Attachment folder define karo (ye missing tha)
         Path folder = Paths.get("email_attachments");
         if (!Files.exists(folder)) {
             Files.createDirectories(folder);
@@ -767,15 +765,10 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                 (email.getSubject() != null ? email.getSubject() : ""));
 
         MimeMultipart mixedMultipart = new MimeMultipart("mixed");
-
-        // ================= RELATED (body + inline images) =================
         MimeMultipart relatedMultipart = new MimeMultipart("related");
-
         MimeBodyPart htmlBodyPart = new MimeBodyPart();
         htmlBodyPart.setContent(email.getBody(), "text/html; charset=UTF-8");
         relatedMultipart.addBodyPart(htmlBodyPart);
-
-        // 🔹 Inline Images
         if (email.getInlineImages() != null && !email.getInlineImages().isBlank()) {
 
             Map<String, String> inlineMap =
@@ -869,12 +862,12 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
                 multipleEmailRepository.findByActiveTrue();
 
         return activeAccounts
-                .stream()   // 👈 parallel hata do, better rahega
+                .stream()   
                 .flatMap(account -> {
                     try {
                         return fetchInbox(account.getId())
                                 .stream()
-                                .peek(dto -> dto.setAccountId(account.getId())); // 👈 yaha
+                                .peek(dto -> dto.setAccountId(account.getId())); 
                     } catch (Exception e) {
                         System.err.println("Failed for account: "
                                 + account.getUsername() + " " + e.getMessage());

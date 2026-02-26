@@ -1,5 +1,7 @@
 package com.mailProject.email.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mailProject.email.dto.*;
 import com.mailProject.email.entity.MultipleEmailAccounts;
 import com.mailProject.email.entity.ReceivedEmails;
@@ -194,6 +196,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
     @Override
     public void sendEmail(Long accountId, SendEmailRequest request) throws Exception {
+
         MultipleEmailAccounts acc = multipleEmailRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("Account not found"));
 
@@ -210,6 +213,16 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         message.setText(request.getBody());
 
         Transport.send(message);
+
+        // 🔥 ADD THIS BLOCK
+        SentMails sentMail = new SentMails();
+        sentMail.setAccountId(accountId);
+        sentMail.setToEmails(String.join(",", request.getTo()));
+        sentMail.setSubject(request.getSubject());
+        sentMail.setBody(request.getBody());
+        sentMail.setSentAt(LocalDateTime.now());
+
+        sentMailRepository.save(sentMail);
     }
 
     @Override
@@ -728,6 +741,12 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             List<String> to
     ) throws Exception {
 
+        // 🔹 Attachment folder define karo (ye missing tha)
+        Path folder = Paths.get("email_attachments");
+        if (!Files.exists(folder)) {
+            Files.createDirectories(folder);
+        }
+
         MultipleEmailAccounts acc = multipleEmailRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("Account not found"));
 
@@ -744,35 +763,26 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             forward.addRecipient(Message.RecipientType.TO, new InternetAddress(r));
         }
 
-        forward.setSubject("Fwd: " + email.getSubject());
-        MimeMultipart multipart = new MimeMultipart("related");
-        MimeBodyPart bodyPart = new MimeBodyPart();
-        bodyPart.setContent(email.getBody(), "text/html; charset=UTF-8");
-        multipart.addBodyPart(bodyPart);
+        forward.setSubject("Fwd: " +
+                (email.getSubject() != null ? email.getSubject() : ""));
 
-        Path folder = Paths.get("email_attachments");
-        if (email.getAttachments() != null && !email.getAttachments().isBlank()) {
+        MimeMultipart mixedMultipart = new MimeMultipart("mixed");
 
-            String[] files = email.getAttachments().split(",");
+        // ================= RELATED (body + inline images) =================
+        MimeMultipart relatedMultipart = new MimeMultipart("related");
 
-            for (String fileName : files) {
+        MimeBodyPart htmlBodyPart = new MimeBodyPart();
+        htmlBodyPart.setContent(email.getBody(), "text/html; charset=UTF-8");
+        relatedMultipart.addBodyPart(htmlBodyPart);
 
-                File file = folder.resolve(fileName.trim()).toFile();
-
-                if (file.exists()) {
-                    MimeBodyPart attachmentPart = new MimeBodyPart();
-                    attachmentPart.attachFile(file);
-                    attachmentPart.setFileName(fileName.trim());
-                    multipart.addBodyPart(attachmentPart);
-                }
-            }
-        }
-        if (email.getInlineImages() != null) {
+        // 🔹 Inline Images
+        if (email.getInlineImages() != null && !email.getInlineImages().isBlank()) {
 
             Map<String, String> inlineMap =
-                    new com.fasterxml.jackson.databind.ObjectMapper()
-                            .readValue(email.getInlineImages(),
-                                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
+                    new ObjectMapper().readValue(
+                            email.getInlineImages(),
+                            new TypeReference<Map<String, String>>() {}
+                    );
 
             for (Map.Entry<String, String> entry : inlineMap.entrySet()) {
 
@@ -785,16 +795,39 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
                     MimeBodyPart inlinePart = new MimeBodyPart();
                     inlinePart.attachFile(file);
-
                     inlinePart.setHeader("Content-ID", "<" + cid + ">");
                     inlinePart.setDisposition(MimeBodyPart.INLINE);
 
-                    multipart.addBodyPart(inlinePart);
+                    relatedMultipart.addBodyPart(inlinePart);
                 }
             }
         }
 
-        forward.setContent(multipart);
+        MimeBodyPart relatedBodyPart = new MimeBodyPart();
+        relatedBodyPart.setContent(relatedMultipart);
+        mixedMultipart.addBodyPart(relatedBodyPart);
+
+        if (email.getAttachments() != null && !email.getAttachments().isBlank()) {
+
+            String[] files = email.getAttachments().split(",");
+
+            for (String fileName : files) {
+
+                File file = folder.resolve(fileName.trim()).toFile();
+
+                if (file.exists()) {
+
+                    MimeBodyPart attachmentPart = new MimeBodyPart();
+                    attachmentPart.attachFile(file);
+                    attachmentPart.setFileName(fileName.trim());
+                    attachmentPart.setDisposition(MimeBodyPart.ATTACHMENT);
+
+                    mixedMultipart.addBodyPart(attachmentPart);
+                }
+            }
+        }
+
+        forward.setContent(mixedMultipart);
 
         Transport.send(forward);
 
@@ -804,6 +837,10 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         sentMail.setSubject("Fwd: " + email.getSubject());
         sentMail.setBody(email.getBody());
         sentMail.setSentAt(LocalDateTime.now());
+        if (email.getAttachments() != null && !email.getAttachments().isBlank()) {
+            sentMail.setAttachments(email.getAttachments());
+        }
+
         sentMailRepository.save(sentMail);
     }
 

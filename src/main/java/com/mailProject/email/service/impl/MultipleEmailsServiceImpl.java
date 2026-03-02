@@ -750,8 +750,36 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         ReceivedEmails email = receiveEmailRepository
                 .findByIdAndAccountId(emailId, accountId)
-                .orElseThrow(() -> new RuntimeException("Email not found"));
+                .orElse(null);
 
+        SentMails sentEmail = null;
+
+        if (email == null) {
+            sentEmail = sentMailRepository
+                    .findById(emailId)
+                    .orElse(null);
+        }
+
+        if (email == null && sentEmail == null) {
+            throw new RuntimeException("Email not found");
+        }
+
+        String subject;
+        String body;
+        String attachments = null;
+        String inlineImages = null;
+
+        if (email != null) {
+            subject = email.getSubject();
+            body = email.getBody();
+            attachments = email.getAttachments();
+            inlineImages = email.getInlineImages();
+        } else {
+            subject = sentEmail.getSubject();
+            body = sentEmail.getBody();
+            attachments = sentEmail.getAttachments();
+            // sent mail me inlineImages usually nahi hote
+        }
         Session smtpSession = createSmtpSession(acc);
 
         MimeMessage forward = new MimeMessage(smtpSession);
@@ -762,18 +790,18 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         }
 
         forward.setSubject("Fwd: " +
-                (email.getSubject() != null ? email.getSubject() : ""));
+                (subject != null ? subject : ""));
 
         MimeMultipart mixedMultipart = new MimeMultipart("mixed");
         MimeMultipart relatedMultipart = new MimeMultipart("related");
         MimeBodyPart htmlBodyPart = new MimeBodyPart();
-        htmlBodyPart.setContent(email.getBody(), "text/html; charset=UTF-8");
+        htmlBodyPart.setContent(body, "text/html; charset=UTF-8");
         relatedMultipart.addBodyPart(htmlBodyPart);
-        if (email.getInlineImages() != null && !email.getInlineImages().isBlank()) {
+        if (inlineImages != null && !inlineImages.isBlank()){
 
             Map<String, String> inlineMap =
                     new ObjectMapper().readValue(
-                            email.getInlineImages(),
+                            inlineImages,
                             new TypeReference<Map<String, String>>() {}
                     );
 
@@ -800,9 +828,9 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         relatedBodyPart.setContent(relatedMultipart);
         mixedMultipart.addBodyPart(relatedBodyPart);
 
-        if (email.getAttachments() != null && !email.getAttachments().isBlank()) {
+        if (attachments != null && !attachments.isBlank()) {
 
-            String[] files = email.getAttachments().split(",");
+            String[] files = attachments.split(",");
 
             for (String fileName : files) {
 
@@ -827,11 +855,11 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         SentMails sentMail = new SentMails();
         sentMail.setAccountId(accountId);
         sentMail.setToEmails(String.join(",", to));
-        sentMail.setSubject("Fwd: " + email.getSubject());
-        sentMail.setBody(email.getBody());
+        sentMail.setSubject("Fwd: " + subject);
+        sentMail.setBody(body);
         sentMail.setSentAt(LocalDateTime.now());
-        if (email.getAttachments() != null && !email.getAttachments().isBlank()) {
-            sentMail.setAttachments(email.getAttachments());
+        if (attachments != null && !attachments.isBlank()) {
+            sentMail.setAttachments(attachments);
         }
 
         sentMailRepository.save(sentMail);

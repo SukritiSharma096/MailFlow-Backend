@@ -12,7 +12,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building the application (tests skipped)...'
-                // Example: Maven build skipping tests
+                
                 // If using Maven:
                 sh 'mvn clean install -DskipTests'
 

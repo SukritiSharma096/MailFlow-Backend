@@ -13,7 +13,7 @@ pipeline {
             steps {
                 echo 'Building the application (tests skipped)...'
                 
-                // If using Maven:
+                
                 sh 'mvn clean install -DskipTests'
 
                 // If using Gradle:

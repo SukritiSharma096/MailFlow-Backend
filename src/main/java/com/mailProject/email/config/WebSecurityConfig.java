@@ -40,7 +40,7 @@ public class WebSecurityConfig {
             "/api/schedulers/*",
             "/api/schedulers/*/toggle-status",
             "/api/schedulers/restart",
-            "/api/accounts/inbox/all"
+            "/api/accounts/inbox/all", "/api/admin/create",
     };
 
     @Bean

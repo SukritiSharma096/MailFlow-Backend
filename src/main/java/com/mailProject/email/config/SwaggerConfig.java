@@ -13,8 +13,8 @@ import org.springframework.beans.factory.annotation.Value;
 public class SwaggerConfig {
 @Bean
 public OpenAPI customOpenAPI(@Value("${app.server-url}") String serverUrl) {
-    return new OpenAPI()
-        .addServersItem(new Server().url(serverUrl));
+return new OpenAPI()
+.addServersItem(new Server().url(serverUrl));
 }
     @Bean
     public OpenAPI customOpenAPI() {

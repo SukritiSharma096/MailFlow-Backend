@@ -1,5 +1,5 @@
 package com.mailProject.email.config;
-import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.annotations.servers.Server;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.OpenAPI;

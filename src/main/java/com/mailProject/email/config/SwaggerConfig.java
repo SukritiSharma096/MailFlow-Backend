@@ -22,9 +22,6 @@ public class SwaggerConfig {
     public OpenAPI customOpenAPI() {
 
         return new OpenAPI()
-             .servers(List.of(
-                        new Server().url("https://jobreader.appts.in")
-                ))
                 .info(new Info()
                         .title("Mail Flow API")
                         .version("1.0")

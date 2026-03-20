@@ -1,5 +1,5 @@
 package com.mailProject.email.config;
-
+import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -17,6 +17,9 @@ public class SwaggerConfig {
     public OpenAPI customOpenAPI() {
 
         return new OpenAPI()
+             .servers(List.of(
+                        new Server().url("https://jobreader.appts.in")
+                ))
                 .info(new Info()
                         .title("Mail Flow API")
                         .version("1.0")

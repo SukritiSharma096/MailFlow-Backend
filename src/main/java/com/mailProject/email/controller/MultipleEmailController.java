@@ -137,7 +137,7 @@ public class MultipleEmailController {
     @GetMapping("/inbox/{accountId}")
     public ResponseEntity<?> getInbox(@PathVariable Long accountId) {
         try {
-            return ResponseEntity.ok(service.fetchInbox(accountId));
+            return ResponseEntity.ok(service.fetchInbox(accountId,0, 100, "sentAt", "desc"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -247,10 +247,26 @@ public class MultipleEmailController {
         );
     }
 
+//    @GetMapping("/inbox/fetch/{accountId}")
+//    public ResponseEntity<?> fetchInbox(@PathVariable Long accountId) {
+//        try {
+//            List<ReceiveEmailResponse> inbox = service.fetchInbox(accountId);
+//            return ResponseEntity.ok(inbox);
+//        } catch (Exception e) {
+//            return ResponseEntity.status(500)
+//                    .body("Failed to fetch inbox: " + e.getMessage());
+//        }
+//    }
+
     @GetMapping("/inbox/fetch/{accountId}")
-    public ResponseEntity<?> fetchInbox(@PathVariable Long accountId) {
+    public ResponseEntity<?> fetchInbox(
+            @PathVariable Long accountId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "sentAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction) {
         try {
-            List<ReceiveEmailResponse> inbox = service.fetchInbox(accountId);
+            Map<String, Object> inbox = service.fetchInbox(accountId, page, size, sort, direction);
             return ResponseEntity.ok(inbox);
         } catch (Exception e) {
             return ResponseEntity.status(500)
@@ -258,10 +274,13 @@ public class MultipleEmailController {
         }
     }
 
+
     @PostMapping("/{accountId}/sync")
     public ResponseEntity<?> manualSyncInbox(@PathVariable Long accountId) {
         try {
-            List<ReceiveEmailResponse> inbox = service.fetchInbox(accountId);
+            Map<String, Object> result = service.fetchInbox(accountId, 0, 100, "sentAt", "desc");
+            List<ReceiveEmailResponse> inbox = (List<ReceiveEmailResponse>) result.get("content");
+
             return ResponseEntity.ok(inbox);
         } catch (Exception e) {
             return ResponseEntity.status(500)
@@ -291,13 +310,18 @@ public class MultipleEmailController {
         );
     }
 
-    @GetMapping("/inbox/all")
-    public ResponseEntity<?> fetchAllAccountsInbox() {
+    @GetMapping("/inbox/fetch-all")
+    public ResponseEntity<?> fetchAllAccountsInbox(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "sentAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction) {
         try {
-            return ResponseEntity.ok(service.fetchAllAccountsInbox());
+            Map<String, Object> inbox = service.fetchAllAccountsInbox(page, size, sort, direction);
+            return ResponseEntity.ok(inbox);
         } catch (Exception e) {
             return ResponseEntity.status(500)
-                    .body("Failed to fetch all inboxes: " + e.getMessage());
+                    .body("Failed to fetch all accounts inbox: " + e.getMessage());
         }
     }
 

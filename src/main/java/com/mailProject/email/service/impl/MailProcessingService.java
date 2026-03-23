@@ -7,10 +7,13 @@ import com.mailProject.email.feignInterface.ClickupClient;
 import com.mailProject.email.repository.MailJobHistoryRepository;
 import com.mailProject.email.repository.MultipleEmailRepository;
 import com.mailProject.email.repository.ReceiveEmailRepository;
+import com.mailProject.email.security.ClickupContext;
+import com.mailProject.email.service.ClickupConfigService;
 import com.mailProject.email.service.MultipleEmailService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,11 +35,16 @@ public class MailProcessingService {
     private final ClickupClient clickupClient;
     private final MailJobHistoryRepository historyRepo;
 
-    @Value("${clickup.list-id}")
-    private String LIST_ID;
+    @Autowired
+    private ClickupConfigService clickupConfigService;
 
     @Transactional
     public int processNewMails(Long accountId) throws Exception {
+
+        if (!clickupConfigService.isConfigured()) {
+            log.warn("ClickUp not configured for this admin. Skipping...");
+            return 0;
+        }
 
         LocalDateTime lastRun = historyRepo
                 .findTopByOrderByStartTimeDesc()
@@ -87,7 +95,14 @@ public class MailProcessingService {
 
                 req.setDescription(description);
 
-                TaskResponse response = clickupClient.createTask(LIST_ID, req);
+                String token = clickupConfigService.getDecryptedToken();
+                String listId = clickupConfigService.getConfig().getListId();
+
+                ClickupContext.setToken(token);
+
+                TaskResponse response = clickupClient.createTask(listId, req);
+
+                ClickupContext.clear();
                 log.info("ClickUp task created successfully! Task ID={}", response.getId());
 
                 uploadAttachments(response.getId(), mail);

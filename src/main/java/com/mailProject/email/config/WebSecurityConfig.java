@@ -71,5 +71,8 @@ public class WebSecurityConfig {
     public AuthenticationManager authenticationManagerBean(AuthenticationConfiguration builder) throws Exception {
         return builder.getAuthenticationManager();
     }
-
+@Bean
+public ForwardedHeaderFilter forwardedHeaderFilter() {
+    return new ForwardedHeaderFilter();
+}
 }

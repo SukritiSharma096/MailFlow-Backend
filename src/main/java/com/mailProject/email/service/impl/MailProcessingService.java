@@ -46,7 +46,7 @@ public class MailProcessingService {
                 })
                 .orElse(LocalDateTime.now().minusDays(7));
 
-        emailService.fetchInbox(accountId);
+        emailService.fetchInbox(accountId, 0, 100, "sentAt", "desc");
         List<ReceivedEmails> newMails =
                 receiveRepo.findByAccountIdAndTaskCreatedFalse(accountId);
 

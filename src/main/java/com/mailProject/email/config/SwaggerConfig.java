@@ -35,5 +35,9 @@ public class SwaggerConfig {
                                 )
                 );
     }
+@Bean
+public ForwardedHeaderFilter forwardedHeaderFilter() {
+    return new ForwardedHeaderFilter();
+}
 }
 

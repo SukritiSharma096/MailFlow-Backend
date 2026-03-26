@@ -3,6 +3,7 @@ package com.mailProject.email.service;
 import com.mailProject.email.dto.*;
 
 import java.util.List;
+import java.util.Map;
 
 public interface MultipleEmailService {
 
@@ -14,7 +15,7 @@ public interface MultipleEmailService {
 
     void sendEmail(Long accountId, SendEmailRequest request) throws Exception;
     void sendEmailWithAttachments(Long accountId, SendEmailRequest request) throws Exception;
-    List<ReceiveEmailResponse> fetchInbox(Long accountId) throws Exception;
+    Map<String, Object> fetchInbox(Long accountId, int page, int size, String sort, String direction) throws Exception;
     void moveGoogleMails(Long accountId);
     void moveYouTubeMails(Long accountId);
     void moveNetflixMails(Long accountId);
@@ -27,6 +28,6 @@ public interface MultipleEmailService {
     List<ReceiveEmailResponse> getInboxFromDb(Long accountId, String folder);
     void forwardEmail(Long accountId, Long emailId, List<String> to) throws Exception;
     boolean deleteSentEmailFromDb(Long accountId, Long emailId);
-    List<ReceiveEmailResponse> fetchAllAccountsInbox();
+    Map<String, Object> fetchAllAccountsInbox(int page, int size, String sort, String direction);
 
 }

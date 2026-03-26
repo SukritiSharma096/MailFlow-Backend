@@ -1,13 +1,19 @@
 package com.mailProject.email.service.impl;
 
 import com.mailProject.email.dto.MailJobHistoryResponseDto;
+import com.mailProject.email.entity.Admin;
 import com.mailProject.email.entity.MailJobHistory;
 import com.mailProject.email.entity.MultipleEmailAccounts;
+import com.mailProject.email.repository.AdminRepository;
 import com.mailProject.email.repository.MailJobHistoryRepository;
 import com.mailProject.email.repository.MultipleEmailRepository;
+import com.mailProject.email.service.ClickupConfigService;
 import com.mailProject.email.service.MailJobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +29,12 @@ public class MailJobServiceImpl implements MailJobService {
     private final MailJobHistoryRepository historyRepo;
     private final MultipleEmailRepository accountRepo;
 
+    @Autowired
+    private AdminRepository adminRepository;
+
+    @Autowired
+    private ClickupConfigService clickupConfigService;
+
     @Override
     @Transactional
     public void runJob(String runType) {
@@ -33,18 +45,34 @@ public class MailJobServiceImpl implements MailJobService {
         int totalTasks = 0;
         boolean anyFailure = false;
 
-        List<MultipleEmailAccounts> accounts = accountRepo.findByActiveTrue();
+        List<Admin> admins = adminRepository.findAllByActiveTrue();
 
-        for (MultipleEmailAccounts account : accounts) {
+        for (Admin admin : admins) {
+
             try {
-                totalTasks += processingService.processNewMails(account.getId());
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                admin.getUsername(), null, List.of()
+                        )
+                );
+                if (!clickupConfigService.isConfigured()) {
+                    continue;
+                }
+
+                List<MultipleEmailAccounts> accounts =
+                        accountRepo.findByActiveTrue();
+
+                for (MultipleEmailAccounts account : accounts) {
+                    totalTasks += processingService.processNewMails(account.getId());
+                }
+
             } catch (Exception e) {
-                log.error("Account {} processing failed: {}", account.getUsername(), e.getMessage());
                 anyFailure = true;
+            } finally {
+                SecurityContextHolder.clearContext();
             }
         }
 
-        // ✅ Only after all accounts processed
         history.setMailCount(totalTasks);
         history.setTaskCreated(totalTasks);
         if (totalTasks > 0 && !anyFailure) {
@@ -57,7 +85,7 @@ public class MailJobServiceImpl implements MailJobService {
 
         history.setEndTime(LocalDateTime.now());
 
-        historyRepo.save(history); // commit after everything
+        historyRepo.save(history);
     }
 
 

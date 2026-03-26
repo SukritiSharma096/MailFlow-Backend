@@ -24,7 +24,7 @@ public class WebSecurityConfig {
 
     private static final String[] AUTH_WHITELIST = {
             "/api/admin/login",
-
+            "/api/admin/create",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/v3/api-docs/**",
@@ -40,7 +40,7 @@ public class WebSecurityConfig {
             "/api/schedulers/*",
             "/api/schedulers/*/toggle-status",
             "/api/schedulers/restart",
-            "/api/accounts/inbox/all"
+            "/api/accounts/inbox/all", "/api/admin/create","/api/clickup/config","/api/clickup/status",
     };
 
     @Bean

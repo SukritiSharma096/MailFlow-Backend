@@ -213,8 +213,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         message.setText(request.getBody());
 
         Transport.send(message);
-
-        // 🔥 ADD THIS BLOCK
         SentMails sentMail = new SentMails();
         sentMail.setAccountId(accountId);
         sentMail.setToEmails(String.join(",", request.getTo()));
@@ -310,7 +308,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
     }
 
     @Override
-    public List<ReceiveEmailResponse> fetchInbox(Long accountId) throws Exception {
+    public Map<String, Object> fetchInbox(Long accountId, int page, int size, String sort, String direction) throws Exception {
 
         MultipleEmailAccounts acc = multipleEmailRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("Account not found"));
@@ -324,68 +322,128 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         if (totalMessages == 0) {
             inbox.close(false);
             store.close();
-            return List.of();
+            return buildEmptyResponse(page, size);
         }
 
-        Message[] messages = inbox.getMessages(1, totalMessages);
-        List<ReceiveEmailResponse> list = new ArrayList<>();
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-        for (Message msg : messages) {
+
+        int totalPages = (int) Math.ceil((double) totalMessages / size);
+
+        if (page >= totalPages) {
+            inbox.close(false);
+            store.close();
+            return buildEmptyResponse(page, size, totalMessages, totalPages);
+        }
+
+
+        int offset = page * size;
+        int startIndex = Math.max(1, totalMessages - offset - size + 1);
+        int endIndex = totalMessages - offset;
+
+
+        startIndex = Math.max(1, startIndex);
+        endIndex = Math.min(totalMessages, endIndex);
+
+
+        Message[] messages = inbox.getMessages(startIndex, endIndex);
+
+        List<Message> messageList = new ArrayList<>(Arrays.asList(messages));
+
+        if ("desc".equalsIgnoreCase(direction)) {
+            Collections.reverse(messageList);
+        }
+
+        List<ReceiveEmailResponse> emailList = new ArrayList<>();
+
+        for (Message msg : messageList) {
             MimeMessage mimeMessage = (MimeMessage) msg;
             String messageId = mimeMessage.getMessageID();
+
             ReceivedEmails email = receiveEmailRepository
                     .findByMessageId(messageId)
-                    .orElseGet(() -> {
-                        ReceivedEmails e = new ReceivedEmails();
-                        e.setMessageId(messageId);
+                    .orElseGet(() -> saveNewEmail(msg, messageId, accountId));
 
-                        try {
-                            e.setSender(msg.getFrom() != null ? msg.getFrom()[0].toString() : null);
-                            e.setReceivers(String.join(",", getReceivers(msg)));
-                            e.setSubject(msg.getSubject());
-                            e.setBody(getBody(msg));
-                            e.setAttachments(String.join(",", getAttachments(msg)));
-                            Map<String, String> inlineImages = extractInlineImages(msg);
-                            if (!inlineImages.isEmpty()) {
-                                e.setInlineImages(
-                                        new com.fasterxml.jackson.databind.ObjectMapper()
-                                                .writeValueAsString(inlineImages)
-                                );
-                            }
-                            e.setSentAt(
-                                    msg.getSentDate() != null
-                                            ? msg.getSentDate().toInstant()
-                                            .atZone(ZoneId.systemDefault())
-                                            .toLocalDateTime()
-                                            : null);
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
-                        e.setReceived(true);
-                        e.setFolder("INBOX");
-                        e.setAccountId(accountId);
-                        return receiveEmailRepository.save(e);
-                    });
+            ReceiveEmailResponse dto = convertToDTO(email);
+            emailList.add(dto);
+        }
 
-            ReceiveEmailResponse dto = new ReceiveEmailResponse();
-            dto.setAccountId(email.getAccountId());
-            dto.setId(email.getId());
-            dto.setSender(email.getSender());
-            dto.setReceiver(
-                    email.getReceivers() != null
-                            ? List.of(email.getReceivers().split(","))
-                            : List.of()
-            );
-            dto.setSubject(email.getSubject());
-            dto.setBody(email.getBody());
-            dto.setSentAt(email.getSentAt());
-            dto.setReceived(true);
-            dto.setFolder("INBOX");
-            dto.setAttachments(
-                    email.getAttachments() != null
-                            ? List.of(email.getAttachments().split(","))
-                            : List.of()
-            );
+        inbox.close(false);
+        store.close();
+
+        return buildPaginatedResponse(emailList, page, size, totalMessages, totalPages);
+    }
+
+    private ReceivedEmails saveNewEmail(Message msg, String messageId, Long accountId) {
+        Optional<ReceivedEmails> existing = receiveEmailRepository.findByMessageId(messageId);
+        if (existing.isPresent()) {
+            return existing.get();  
+        }
+
+        ReceivedEmails e = new ReceivedEmails();
+        e.setMessageId(messageId);
+
+        try {
+            e.setSender(msg.getFrom() != null ? msg.getFrom()[0].toString() : null);
+            e.setReceivers(String.join(",", getReceivers(msg)));
+            e.setSubject(msg.getSubject());
+            e.setBody(getBody(msg));
+            e.setAttachments(String.join(",", getAttachments(msg)));
+
+            Map<String, String> inlineImages = extractInlineImages(msg);
+            if (!inlineImages.isEmpty()) {
+                e.setInlineImages(
+                        new com.fasterxml.jackson.databind.ObjectMapper()
+                                .writeValueAsString(inlineImages)
+                );
+            }
+
+            e.setSentAt(
+                    msg.getSentDate() != null
+                            ? msg.getSentDate().toInstant()
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDateTime()
+                            : null);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+        e.setReceived(true);
+        e.setFolder("INBOX");
+        e.setAccountId(accountId);
+
+        try {
+            return receiveEmailRepository.save(e);
+        } catch (Exception ex) {
+            return receiveEmailRepository.findByMessageId(messageId)
+                    .orElseThrow(() -> new RuntimeException("Email not found after save error"));
+        }
+    }
+
+    private ReceiveEmailResponse convertToDTO(ReceivedEmails email) {
+        ReceiveEmailResponse dto = new ReceiveEmailResponse();
+        dto.setAccountId(email.getAccountId());
+        dto.setId(email.getId());
+        dto.setSender(email.getSender());
+        dto.setReceiver(
+                email.getReceivers() != null
+                        ? List.of(email.getReceivers().split(","))
+                        : List.of()
+        );
+        dto.setSubject(email.getSubject());
+        dto.setBody(email.getBody());
+        dto.setSentAt(email.getSentAt());
+        dto.setReceived(true);
+        dto.setFolder("INBOX");
+        dto.setAttachments(
+                email.getAttachments() != null
+                        ? List.of(email.getAttachments().split(","))
+                        : List.of()
+        );
+
+        try {
             if (email.getInlineImages() != null) {
                 dto.setInlineImages(
                         new com.fasterxml.jackson.databind.ObjectMapper()
@@ -398,11 +456,51 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             } else {
                 dto.setInlineImages(Map.of());
             }
-            list.add(dto);
+        } catch (Exception e) {
+            dto.setInlineImages(Map.of());
         }
-        inbox.close(false);
-        store.close();
-        return list;
+
+        return dto;
+    }
+
+    private Map<String, Object> buildPaginatedResponse(
+            List<ReceiveEmailResponse> content,
+            int page,
+            int size,
+            int totalElements,
+            int totalPages) {
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", content);
+        response.put("page", page);
+        response.put("size", size);
+        response.put("totalElements", totalElements);
+        response.put("totalPages", totalPages);
+        response.put("last", page >= totalPages - 1);
+        response.put("first", page == 0);
+        response.put("numberOfElements", content.size());
+        response.put("empty", content.isEmpty());
+
+        return response;
+    }
+    
+    private Map<String, Object> buildEmptyResponse(int page, int size) {
+        return buildEmptyResponse(page, size, 0, 0);
+    }
+
+    private Map<String, Object> buildEmptyResponse(int page, int size, int totalElements, int totalPages) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", List.of());
+        response.put("page", page);
+        response.put("size", size);
+        response.put("totalElements", totalElements);
+        response.put("totalPages", totalPages);
+        response.put("last", true);
+        response.put("first", true);
+        response.put("numberOfElements", 0);
+        response.put("empty", true);
+
+        return response;
     }
 
 
@@ -740,8 +838,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             Long emailId,
             List<String> to
     ) throws Exception {
-
-        // 🔹 Attachment folder define karo (ye missing tha)
         Path folder = Paths.get("email_attachments");
         if (!Files.exists(folder)) {
             Files.createDirectories(folder);
@@ -752,8 +848,35 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         ReceivedEmails email = receiveEmailRepository
                 .findByIdAndAccountId(emailId, accountId)
-                .orElseThrow(() -> new RuntimeException("Email not found"));
+                .orElse(null);
 
+        SentMails sentEmail = null;
+
+        if (email == null) {
+            sentEmail = sentMailRepository
+                    .findById(emailId)
+                    .orElse(null);
+        }
+
+        if (email == null && sentEmail == null) {
+            throw new RuntimeException("Email not found");
+        }
+
+        String subject;
+        String body;
+        String attachments = null;
+        String inlineImages = null;
+
+        if (email != null) {
+            subject = email.getSubject();
+            body = email.getBody();
+            attachments = email.getAttachments();
+            inlineImages = email.getInlineImages();
+        } else {
+            subject = sentEmail.getSubject();
+            body = sentEmail.getBody();
+            attachments = sentEmail.getAttachments();
+        }
         Session smtpSession = createSmtpSession(acc);
 
         MimeMessage forward = new MimeMessage(smtpSession);
@@ -764,24 +887,20 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         }
 
         forward.setSubject("Fwd: " +
-                (email.getSubject() != null ? email.getSubject() : ""));
+                (subject != null ? subject : ""));
 
         MimeMultipart mixedMultipart = new MimeMultipart("mixed");
-
-        // ================= RELATED (body + inline images) =================
         MimeMultipart relatedMultipart = new MimeMultipart("related");
-
         MimeBodyPart htmlBodyPart = new MimeBodyPart();
-        htmlBodyPart.setContent(email.getBody(), "text/html; charset=UTF-8");
+        htmlBodyPart.setContent(body, "text/html; charset=UTF-8");
         relatedMultipart.addBodyPart(htmlBodyPart);
-
-        // 🔹 Inline Images
-        if (email.getInlineImages() != null && !email.getInlineImages().isBlank()) {
+        if (inlineImages != null && !inlineImages.isBlank()) {
 
             Map<String, String> inlineMap =
                     new ObjectMapper().readValue(
-                            email.getInlineImages(),
-                            new TypeReference<Map<String, String>>() {}
+                            inlineImages,
+                            new TypeReference<Map<String, String>>() {
+                            }
                     );
 
             for (Map.Entry<String, String> entry : inlineMap.entrySet()) {
@@ -807,9 +926,9 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         relatedBodyPart.setContent(relatedMultipart);
         mixedMultipart.addBodyPart(relatedBodyPart);
 
-        if (email.getAttachments() != null && !email.getAttachments().isBlank()) {
+        if (attachments != null && !attachments.isBlank()) {
 
-            String[] files = email.getAttachments().split(",");
+            String[] files = attachments.split(",");
 
             for (String fileName : files) {
 
@@ -834,11 +953,11 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         SentMails sentMail = new SentMails();
         sentMail.setAccountId(accountId);
         sentMail.setToEmails(String.join(",", to));
-        sentMail.setSubject("Fwd: " + email.getSubject());
-        sentMail.setBody(email.getBody());
+        sentMail.setSubject("Fwd: " + subject);
+        sentMail.setBody(body);
         sentMail.setSentAt(LocalDateTime.now());
-        if (email.getAttachments() != null && !email.getAttachments().isBlank()) {
-            sentMail.setAttachments(email.getAttachments());
+        if (attachments != null && !attachments.isBlank()) {
+            sentMail.setAttachments(attachments);
         }
 
         sentMailRepository.save(sentMail);
@@ -863,27 +982,55 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
 
     @Override
-    public List<ReceiveEmailResponse> fetchAllAccountsInbox() {
+    public Map<String, Object> fetchAllAccountsInbox(int page, int size, String sort, String direction) {
 
-        List<MultipleEmailAccounts> activeAccounts =
-                multipleEmailRepository.findByActiveTrue();
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-        return activeAccounts
-                .stream()   // 👈 parallel hata do, better rahega
+        List<MultipleEmailAccounts> activeAccounts = multipleEmailRepository.findByActiveTrue();
+
+        if (activeAccounts.isEmpty()) {
+            return buildEmptyResponse(page, size);
+        }
+
+        int emailsPerAccount = 1000;
+
+        List<ReceiveEmailResponse> allEmails = activeAccounts
+                .stream()
                 .flatMap(account -> {
                     try {
-                        return fetchInbox(account.getId())
-                                .stream()
-                                .peek(dto -> dto.setAccountId(account.getId())); // 👈 yaha
+                        Map<String, Object> result = fetchInbox(account.getId(), 0, emailsPerAccount, sort, direction);
+                        List<ReceiveEmailResponse> emails = (List<ReceiveEmailResponse>) result.get("content");
+
+                        return emails.stream()
+                                .peek(dto -> dto.setAccountId(account.getId()));
+
                     } catch (Exception e) {
-                        System.err.println("Failed for account: "
-                                + account.getUsername() + " " + e.getMessage());
+                        System.err.println("Failed for account: " + account.getUsername() + " " + e.getMessage());
                         return List.<ReceiveEmailResponse>of().stream();
                     }
                 })
                 .sorted(Comparator.comparing(ReceiveEmailResponse::getSentAt,
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
-    }
 
+        int totalElements = allEmails.size();
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+
+
+        if (page >= totalPages && totalElements > 0) {
+            return buildEmptyResponse(page, size, totalElements, totalPages);
+        }
+
+        int start = page * size;
+        int end = Math.min(start + size, totalElements);
+
+        List<ReceiveEmailResponse> paginatedContent = totalElements > 0
+                ? allEmails.subList(start, end)
+                : List.of();
+
+        return buildPaginatedResponse(paginatedContent, page, size, totalElements, totalPages);
+    }
 }
+

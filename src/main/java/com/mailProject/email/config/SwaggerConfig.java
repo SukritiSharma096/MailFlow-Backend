@@ -12,19 +12,15 @@ import io.swagger.v3.oas.models.servers.Server;
 
 @Configuration
 public class SwaggerConfig {
-@Bean
-public OpenAPI customOpenAPI(@Value("${app.server-url}") String serverUrl) {
-return new OpenAPI()
-.addServersItem(new Server().url(serverUrl));
-}
     @Bean
-    public OpenAPI customOpenAPI() {
-
+    public OpenAPI customOpenAPI(@Value("${app.server-url}") String serverUrl) {
         return new OpenAPI()
                 .info(new Info()
                         .title("Mail Flow API")
                         .version("1.0")
                         .description("Mail Flow Backend APIs"))
+                .addServersItem(new Server().url("https://jobrader.appts.in"))
+                .addServersItem(new Server().url(serverUrl))
                 .addSecurityItem(
                         new SecurityRequirement().addList("bearerAuth")
                 )
@@ -39,9 +35,5 @@ return new OpenAPI()
                                 )
                 );
     }
-    @Bean
-public ForwardedHeaderFilter forwardedHeaderFilter() {
-    return new ForwardedHeaderFilter();
-}
 }
 

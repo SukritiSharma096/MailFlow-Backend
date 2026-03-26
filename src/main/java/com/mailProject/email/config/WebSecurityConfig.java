@@ -14,6 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.mailProject.email.security.JwtAuthFilter;
+import org.springframework.web.filter.ForwardedHeaderFilter;
 
 @Configuration
 @EnableMethodSecurity

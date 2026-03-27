@@ -6,7 +6,6 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-// import org.springframework.web.filter.ForwardedHeaderFilter;
 import org.springframework.beans.factory.annotation.Value;
 import io.swagger.v3.oas.models.servers.Server;
 
@@ -19,7 +18,7 @@ public class SwaggerConfig {
                         .title("Mail Flow API")
                         .version("1.0")
                         .description("Mail Flow Backend APIs"))
-                .addServersItem(new Server().url("https://jobreader.appts.in"))
+//                .addServersItem(new Server().url("https://jobreader.appts.in"))
                 .addServersItem(new Server().url(serverUrl))
                 .addSecurityItem(
                         new SecurityRequirement().addList("bearerAuth")
@@ -35,6 +34,5 @@ public class SwaggerConfig {
                                 )
                 );
     }
-
 }
 

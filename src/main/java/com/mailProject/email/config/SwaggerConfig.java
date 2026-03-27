@@ -18,7 +18,7 @@ public class SwaggerConfig {
                         .title("Mail Flow API")
                         .version("1.0")
                         .description("Mail Flow Backend APIs"))
-//                .addServersItem(new Server().url("https://jobreader.appts.in"))
+
                 .addServersItem(new Server().url(serverUrl))
                 .addSecurityItem(
                         new SecurityRequirement().addList("bearerAuth")

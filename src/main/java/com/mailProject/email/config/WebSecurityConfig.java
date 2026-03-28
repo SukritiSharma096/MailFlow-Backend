@@ -24,8 +24,8 @@ public class WebSecurityConfig {
     private JwtAuthFilter jwtAuthFilter;
 
     private static final String[] AUTH_WHITELIST = {
-            // "/api/admin/login",
-            // "/api/admin/create",
+            "/api/admin/login",
+            "/api/admin/create",
             // "/swagger-ui.html",
             // "/swagger-ui/**",
             // "/v3/api-docs/**",

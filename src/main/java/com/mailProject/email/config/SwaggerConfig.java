@@ -11,28 +11,31 @@ import io.swagger.v3.oas.models.servers.Server;
 
 @Configuration
 public class SwaggerConfig {
+
+    @Value("${app.server-url}")
+    private String serverUrl;
+
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
+                .addServersItem(new Server().url(serverUrl))
                 .info(new Info()
                         .title("Mail Flow API")
                         .version("1.0")
                         .description("Mail Flow Backend APIs"))
-
-                .addServersItem(new Server().url(serverUrl))
-                .addSecurityItem(
-                        new SecurityRequirement().addList("bearerAuth")
-                )
-                .components(
-                        new Components()
-                                .addSecuritySchemes(
-                                        "bearerAuth",
-                                        new SecurityScheme()
-                                                .type(SecurityScheme.Type.HTTP)
-                                                .scheme("bearer")
-                                                .bearerFormat("JWT")
-                                )
+                .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
+                .components(new Components()
+                        .addSecuritySchemes("bearerAuth",
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")
+                        )
                 );
     }
-}
 
+    // @Bean
+    // public ForwardedHeaderFilter forwardedHeaderFilter() {
+    //     return new ForwardedHeaderFilter();
+    // }
+}

@@ -12,7 +12,7 @@ import io.swagger.v3.oas.models.servers.Server;
 @Configuration
 public class SwaggerConfig {
     @Bean
-    public OpenAPI customOpenAPI(@Value("${app.server-url}") String serverUrl) {
+    public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
                         .title("Mail Flow API")

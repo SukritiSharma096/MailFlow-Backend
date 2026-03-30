@@ -14,6 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.mailProject.email.security.JwtAuthFilter;
+import org.springframework.web.filter.ForwardedHeaderFilter;
 
 @Configuration
 @EnableMethodSecurity
@@ -40,7 +41,7 @@ public class WebSecurityConfig {
             // "/api/schedulers/*",
             // "/api/schedulers/*/toggle-status",
             // "/api/schedulers/restart",
-            // "/api/accounts/inbox/all", "/api/admin/create",
+            // "/api/accounts/inbox/all", "/api/admin/create","/api/clickup/config","/api/clickup/status",
     };
 
     @Bean
@@ -71,5 +72,8 @@ public class WebSecurityConfig {
     public AuthenticationManager authenticationManagerBean(AuthenticationConfiguration builder) throws Exception {
         return builder.getAuthenticationManager();
     }
-
+@Bean
+public ForwardedHeaderFilter forwardedHeaderFilter() {
+    return new ForwardedHeaderFilter();
+}
 }

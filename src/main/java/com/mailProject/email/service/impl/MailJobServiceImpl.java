@@ -38,12 +38,22 @@ public class MailJobServiceImpl implements MailJobService {
     @Override
     @Transactional
     public void runJob(String runType) {
+
         MailJobHistory history = new MailJobHistory();
         history.setRunType(runType);
         history.setStartTime(LocalDateTime.now());
 
         int totalTasks = 0;
         boolean anyFailure = false;
+
+        if (!clickupConfigService.isConfigured()) {
+            log.warn("ClickUp not configured. Skipping job...");
+
+            history.setStatus("FAILED");
+            history.setEndTime(LocalDateTime.now());
+            historyRepo.save(history);
+            return;
+        }
 
         List<Admin> admins = adminRepository.findAllByActiveTrue();
 
@@ -55,19 +65,18 @@ public class MailJobServiceImpl implements MailJobService {
                                 admin.getUsername(), null, List.of()
                         )
                 );
-                if (!clickupConfigService.isConfigured()) {
-                    continue;
-                }
 
                 List<MultipleEmailAccounts> accounts =
                         accountRepo.findByActiveTrue();
 
                 for (MultipleEmailAccounts account : accounts) {
+
                     totalTasks += processingService.processNewMails(account.getId());
                 }
 
             } catch (Exception e) {
                 anyFailure = true;
+                log.error("Error in job execution: {}", e.getMessage(), e);
             } finally {
                 SecurityContextHolder.clearContext();
             }
@@ -75,6 +84,7 @@ public class MailJobServiceImpl implements MailJobService {
 
         history.setMailCount(totalTasks);
         history.setTaskCreated(totalTasks);
+
         if (totalTasks > 0 && !anyFailure) {
             history.setStatus("SUCCESS");
         } else if (totalTasks > 0) {
@@ -87,8 +97,6 @@ public class MailJobServiceImpl implements MailJobService {
 
         historyRepo.save(history);
     }
-
-
 
     @Override
     public MailJobHistoryResponseDto getLatest() {

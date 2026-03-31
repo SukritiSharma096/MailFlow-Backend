@@ -16,10 +16,9 @@ public class ClickupConfig {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String token; // encrypted
-    private String listId;
+    private String token;
+    private String teamId;
 
-    @OneToOne
-    @JoinColumn(name = "admin_id")
-    private Admin admin;
+    private String spaceId;
+    private String listId;
 }

@@ -1,60 +1,115 @@
 package com.mailProject.email.service;
 
-import com.mailProject.email.entity.Admin;
 import com.mailProject.email.entity.ClickupConfig;
-import com.mailProject.email.repository.AdminRepository;
+import com.mailProject.email.feignInterface.ClickupClient;
 import com.mailProject.email.repository.ClickupConfigRepository;
 import com.mailProject.email.security.AESUtil;
+import com.mailProject.email.security.ClickupContext;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class ClickupConfigService {
 
-    private final ClickupConfigRepository configRepo;
-    private final AdminRepository adminRepo;
+    private final ClickupClient clickupClient;
+    private final ClickupConfigRepository repo;
 
-    private Admin getCurrentAdmin() {
-        String username = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
-
-        return adminRepo.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Admin not found"));
+    public ClickupConfig getConfig() {
+        return repo.findTopByOrderByIdDesc()
+                .orElseThrow(() -> new RuntimeException("ClickUp config not found"));
     }
 
-
-    public void saveOrUpdate(String token, String listId) {
-
-        Admin admin = getCurrentAdmin();
-
-        ClickupConfig config = configRepo
-                .findByAdmin(admin)
-                .orElse(new ClickupConfig());
-
-        config.setAdmin(admin);
+    public void save(String token, String teamId) {
+        ClickupConfig config = new ClickupConfig();
         config.setToken(AESUtil.encrypt(token));
-        config.setListId(listId);
-
-        configRepo.save(config);
+        config.setTeamId(teamId);
+        repo.save(config);
     }
 
     public boolean isConfigured() {
-        Admin admin = getCurrentAdmin();
-        return configRepo.findByAdmin(admin).isPresent();
+        try {
+            ClickupConfig c = getConfig();
+            return c.getToken() != null
+                    && c.getTeamId() != null
+                    && c.getListId() != null; // final required
+        } catch (Exception e) {
+            return false;
+        }
     }
 
-    public ClickupConfig getConfig() {
-        Admin admin = getCurrentAdmin();
-        return configRepo.findByAdmin(admin)
-                .orElseThrow(() -> new RuntimeException("ClickUp not configured"));
+    public void saveConfig(ClickupConfig config) {
+        repo.save(config);
     }
 
-    public String getDecryptedToken() {
+    public Object getSpaces() {
         ClickupConfig config = getConfig();
-        return AESUtil.decrypt(config.getToken());
+        String token = AESUtil.decrypt(config.getToken());
+
+        ClickupContext.setToken(token);
+        try {
+            return clickupClient.getSpaces(config.getTeamId());
+        } finally {
+            ClickupContext.clear();
+        }
+    }
+
+    public Object getLists(String spaceId) {
+        ClickupConfig config = getConfig();
+        String token = AESUtil.decrypt(config.getToken());
+
+        ClickupContext.setToken(token);
+        try {
+            return clickupClient.getLists(spaceId);
+        } finally {
+            ClickupContext.clear();
+        }
+    }
+
+    public Object createSpace(String name) {
+        ClickupConfig config = getConfig();
+        String token = AESUtil.decrypt(config.getToken());
+
+        ClickupContext.setToken(token);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+
+        try {
+            return clickupClient.createSpace(config.getTeamId(), body);
+        } finally {
+            ClickupContext.clear();
+        }
+    }
+
+    public Object createList(String spaceId, String name) {
+        ClickupConfig config = getConfig();
+        String token = AESUtil.decrypt(config.getToken());
+
+        ClickupContext.setToken(token);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+
+        try {
+            return clickupClient.createList(spaceId, body);
+        } finally {
+            ClickupContext.clear();
+        }
+    }
+
+    public void selectSpace(String spaceId) {
+        ClickupConfig config = getConfig();
+        config.setSpaceId(spaceId);
+        repo.save(config);
+    }
+
+    public void selectList(String listId) {
+        ClickupConfig config = getConfig();
+        config.setListId(listId);
+        repo.save(config);
     }
 }

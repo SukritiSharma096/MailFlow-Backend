@@ -7,4 +7,5 @@ public class AdminRequest {
 
     private String username;
     private String password;
+    private String role;
 }

@@ -41,7 +41,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 if (username != null &&
                         SecurityContextHolder.getContext().getAuthentication() == null) {
-
+                    var roles = jwtUtil.extractRoles(token);
                     UserDetails userDetails =
                             userDetailsService.loadUserByUsername(username);
 

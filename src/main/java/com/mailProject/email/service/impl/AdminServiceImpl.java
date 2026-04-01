@@ -6,8 +6,14 @@ import com.mailProject.email.entity.Admin;
 import com.mailProject.email.repository.AdminRepository;
 import com.mailProject.email.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AdminServiceImpl implements AdminService {
@@ -18,15 +24,7 @@ public class AdminServiceImpl implements AdminService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    private AdminResponse toResponse(Admin admin) {
-        AdminResponse resp = new AdminResponse();
-        resp.setId(admin.getId());
-        resp.setUsername(admin.getUsername());
-        resp.setRole(admin.getRole());
-        resp.setActive(admin.getActive());
-        resp.setCreatedAt(admin.getCreatedAt());
-        return resp;
-    }
+
 
     @Override
     public AdminResponse createAdmin(AdminRequest request) {
@@ -36,11 +34,41 @@ public class AdminServiceImpl implements AdminService {
         Admin admin = new Admin();
         admin.setUsername(request.getUsername());
         admin.setPassword(passwordEncoder.encode(request.getPassword()));
-        admin.setRole("ADMIN");
+        if(request.getRole() != null && !request.getRole().isBlank()) {
+            admin.setRole(request.getRole().toUpperCase());
+        } else {
+            admin.setRole("ADMIN");
+        }
+        admin.setCreatedAt(LocalDateTime.now());
+        admin.setActive(true);
 
         Admin saved = adminRepository.save(admin);
         return toResponse(saved);
     }
+//@Override
+//public AdminResponse createAdmin(AdminRequest request) {
+//    if(adminRepository.findByUsername(request.getUsername()).isPresent()) {
+//        throw new RuntimeException("Admin already exists");
+//    }
+//
+//    Admin admin = new Admin();
+//    admin.setUsername(request.getUsername());
+//    admin.setPassword(passwordEncoder.encode(request.getPassword()));
+
+    // Role default ADMIN if not provided
+//    if(request.getRole() != null && !request.getRole().isBlank()) {
+//        admin.setRole(request.getRole().toUpperCase());
+//    }
+//    else {
+//        admin.setRole("ADMIN");
+//    }
+
+//    admin.setCreatedAt(LocalDateTime.now());
+//    admin.setActive(true);
+//
+//    Admin saved = adminRepository.save(admin);
+//    return toResponse(saved);
+//}
 
     @Override
     public boolean verifyAdmin(String username, String password) {
@@ -56,4 +84,54 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
         return toResponse(admin);
     }
+
+    @Override
+    public List<AdminResponse> getAllAdmins() {
+        List<Admin> admins = adminRepository.findAll();
+        List<AdminResponse> responses = new ArrayList<>();
+
+        for (Admin admin : admins) {
+            AdminResponse resp = new AdminResponse();
+            resp.setId(admin.getId());
+            resp.setUsername(admin.getUsername());
+            resp.setRole(admin.getRole());
+            responses.add(resp);
+        }
+
+        return responses;
+    }
+    @Override
+    public AdminResponse updateAdmin(AdminRequest request) {
+        // 1. firstly check exist or not
+        Admin admin = adminRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new RuntimeException(
+                        "Admin with username " + request.getUsername() + " not found"));
+
+
+        if(request.getPassword() != null && !request.getPassword().isBlank()) {
+            admin.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
+        Admin updated = adminRepository.save(admin);
+
+        return toResponse(updated);
+    }
+    @Override
+    public void deleteAdmin(Long id) {
+        Admin admin = adminRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException(
+                        "Admin with id " + id + " not found"));
+
+        adminRepository.delete(admin);
+    }
+    private AdminResponse toResponse(Admin admin) {
+        AdminResponse resp = new AdminResponse();
+        resp.setId(admin.getId());
+        resp.setUsername(admin.getUsername());
+        resp.setRole(admin.getRole());
+        resp.setActive(admin.getActive());
+        resp.setCreatedAt(admin.getCreatedAt());
+        return resp;
+    }
+
 }

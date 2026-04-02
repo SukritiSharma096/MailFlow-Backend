@@ -1,14 +1,16 @@
+
 package com.mailProject.email.controller;
 
 import com.mailProject.email.dto.AdminLoginResponse;
 import com.mailProject.email.dto.AdminRequest;
 import com.mailProject.email.dto.AdminResponse;
+import com.mailProject.email.repository.AdminRepository;
 import com.mailProject.email.security.JwtUtil;
 import com.mailProject.email.service.AdminService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -16,7 +18,8 @@ import java.util.List;
 @RequestMapping("/api/admin")
 @CrossOrigin("*")
 public class AdminController {
-
+    @Autowired
+    private AdminRepository adminRepository;
     @Autowired
     private AdminService adminService;
 
@@ -24,63 +27,97 @@ public class AdminController {
     private JwtUtil jwtUtil;
 
     @PostMapping("/create")
-    public ResponseEntity<AdminResponse> createAdmin(@Valid
-            @RequestBody AdminRequest request) {
+    public ResponseEntity<?> createAdmin(
+            @Valid @RequestBody AdminRequest request,
+            HttpServletRequest httpRequest) {
+
+        String authHeader = httpRequest.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        String token = authHeader.substring(7);
+        String loggedInRole  = jwtUtil.extractRoles(token).get(0); // e.g., ROLE_ADMIN
+
+        if ("ROLE_MANAGER".equals(loggedInRole) && !"USER".equalsIgnoreCase(request.getRole())) {
+            return ResponseEntity.status(403).body("Manager can create only USER");
+        }
         return ResponseEntity.ok(adminService.createAdmin(request));
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AdminRequest request) {
-
-        boolean valid = adminService.verifyAdmin(
-                request.getUsername(),
-                request.getPassword());
+        boolean valid = adminService.verifyAdmin(request.getUsername(), request.getPassword());
         if (!valid) {
-            return ResponseEntity
-                    .status(401)
-                    .body("Invalid username or password");
+            return ResponseEntity.status(401).body("Invalid username or password");
         }
 
-        AdminResponse admin =
-                adminService.getAdminByUsername(request.getUsername());
+        AdminResponse admin = adminService.getAdminByUsername(request.getUsername());
         String token = jwtUtil.generateToken(
                 admin.getUsername(),
                 List.of("ROLE_" + admin.getRole())
         );
 
         return ResponseEntity.ok(
-                new AdminLoginResponse(
-                        token,
-                        "Bearer",
-                        admin.getUsername(),
-                        admin.getRole()
-                )
+                new AdminLoginResponse(token, "Bearer", admin.getUsername(), admin.getRole())
         );
     }
 
-    @GetMapping("/read/{username}")
-    public ResponseEntity<AdminResponse> getAdmin(
-            @PathVariable String username) {
-        return ResponseEntity.ok(
-                adminService.getAdminByUsername(username)
-        );
+    @GetMapping("/profile")
+    public ResponseEntity<?> getProfile(HttpServletRequest httpRequest) {
+        String username = jwtUtil.extractUsernameFromRequest(httpRequest);
+        if (username == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        return ResponseEntity.ok(adminService.getAdminByUsername(username));
     }
     @GetMapping("/all")
-    public ResponseEntity<List<AdminResponse>> getAllAdmins() {
-        List<AdminResponse> admins = adminService.getAllAdmins();
-        return ResponseEntity.ok(admins);
-    }
+    public ResponseEntity<?> getAllAdmins(HttpServletRequest httpRequest) {
+        String authHeader = httpRequest.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
 
-    @PutMapping("/update")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<AdminResponse> updateAdmin(@RequestBody AdminRequest request) {
-        return ResponseEntity.ok(adminService.updateAdmin(request));
+        String token = authHeader.substring(7);
+        String role = jwtUtil.extractRoles(token).get(0);
+
+        if (!role.equals("ROLE_ADMIN")) {
+            return ResponseEntity.status(403).body("Only ADMIN can view all users");
+        }
+        return ResponseEntity.ok(adminService.getAllAdmins());
+    }
+    @PutMapping("/update/{id}")
+    public ResponseEntity<?> updateAdmin(
+            @PathVariable Long id,
+            @RequestBody AdminRequest request,
+            HttpServletRequest httpRequest) {
+
+        String authHeader = httpRequest.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        String token = authHeader.substring(7);
+        String role = jwtUtil.extractRoles(token).get(0);
+        String username = jwtUtil.extractUsername(token);
+
+        return ResponseEntity.ok(adminService.updateAdmin(id, request, username, role));
     }
 
     @DeleteMapping("/delete/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> deleteAdmin(@PathVariable Long id) {
+    public ResponseEntity<?> deleteAdmin(@PathVariable Long id, HttpServletRequest httpRequest) {
+        String authHeader = httpRequest.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        String token = authHeader.substring(7);
+        String role = jwtUtil.extractRoles(token).get(0);
+
+        if (!role.equals("ROLE_ADMIN")) {
+            return ResponseEntity.status(403).body("Only ADMIN can delete users");
+        }
         adminService.deleteAdmin(id);
-        return ResponseEntity.ok("Admin deleted successfully");
+        return ResponseEntity.ok("User deleted successfully");
     }
 }

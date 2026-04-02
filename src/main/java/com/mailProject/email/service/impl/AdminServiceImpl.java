@@ -28,16 +28,16 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public AdminResponse createAdmin(AdminRequest request) {
-        if(adminRepository.findByUsername(request.getUsername()).isPresent())
-            throw new RuntimeException("Admin already exists");
+        if (adminRepository.findByUsername(request.getUsername()).isPresent())
+            throw new RuntimeException("User already exists");
 
         Admin admin = new Admin();
         admin.setUsername(request.getUsername());
         admin.setPassword(passwordEncoder.encode(request.getPassword()));
-        if(request.getRole() != null && !request.getRole().isBlank()) {
+        if (request.getRole() != null && !request.getRole().isBlank()) {
             admin.setRole(request.getRole().toUpperCase());
         } else {
-            admin.setRole("ADMIN");
+            admin.setRole("USER");
         }
         admin.setCreatedAt(LocalDateTime.now());
         admin.setActive(true);
@@ -45,30 +45,6 @@ public class AdminServiceImpl implements AdminService {
         Admin saved = adminRepository.save(admin);
         return toResponse(saved);
     }
-//@Override
-//public AdminResponse createAdmin(AdminRequest request) {
-//    if(adminRepository.findByUsername(request.getUsername()).isPresent()) {
-//        throw new RuntimeException("Admin already exists");
-//    }
-//
-//    Admin admin = new Admin();
-//    admin.setUsername(request.getUsername());
-//    admin.setPassword(passwordEncoder.encode(request.getPassword()));
-
-    // Role default ADMIN if not provided
-//    if(request.getRole() != null && !request.getRole().isBlank()) {
-//        admin.setRole(request.getRole().toUpperCase());
-//    }
-//    else {
-//        admin.setRole("ADMIN");
-//    }
-
-//    admin.setCreatedAt(LocalDateTime.now());
-//    admin.setActive(true);
-//
-//    Admin saved = adminRepository.save(admin);
-//    return toResponse(saved);
-//}
 
     @Override
     public boolean verifyAdmin(String username, String password) {
@@ -101,21 +77,112 @@ public class AdminServiceImpl implements AdminService {
         return responses;
     }
     @Override
-    public AdminResponse updateAdmin(AdminRequest request) {
-        // 1. firstly check exist or not
-        Admin admin = adminRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException(
-                        "Admin with username " + request.getUsername() + " not found"));
+    public AdminResponse updateAdmin(Long id, AdminRequest request, String loggedInUsername, String role) {
 
+        Admin target = adminRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if(request.getPassword() != null && !request.getPassword().isBlank()) {
-            admin.setPassword(passwordEncoder.encode(request.getPassword()));
+        // Manager can update only self or USER
+        if ("MANAGER".equals(role)) {
+
+            if ("ADMIN".equals(target.getRole())) {
+                throw new RuntimeException("Manager cannot update admin profile");
+            }
+
+            boolean isSelf = loggedInUsername.equals(target.getUsername());
+            boolean isUser = "USER".equals(target.getRole());
+
+            if (!isSelf && !isUser) {
+                throw new RuntimeException("Manager can update only self or USER");
+            }
         }
 
-        Admin updated = adminRepository.save(admin);
+        // Update username
+        if (request.getUsername() != null && !request.getUsername().isBlank()
+                && !request.getUsername().equals(target.getUsername())) {
+            if (adminRepository.existsByUsername(request.getUsername())) {
+                throw new RuntimeException("Username already taken");
+            }
+            target.setUsername(request.getUsername());
+        }
 
+        // Update password
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            target.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
+        // Update role
+        if (request.getRole() != null && !request.getRole().isBlank()) {
+            if ("MANAGER".equals(role) && !"USER".equals(target.getRole())) {
+                throw new RuntimeException("Manager cannot change role of self or other MANAGER");
+            }
+            target.setRole(request.getRole());
+        }
+
+        Admin updated = adminRepository.save(target);
         return toResponse(updated);
     }
+//correct
+//    @Override
+//    public AdminResponse updateAdmin(Long id, AdminRequest request, String loggedInUsername, String role) {
+//
+//        Admin target = adminRepository.findById(id)
+//                .orElseThrow(() -> new RuntimeException("User not found"));
+//
+//        // 🔐 RBAC check for MANAGER
+//        if ("ROLE_MANAGER".equals(role)) {
+//
+//            if ("ROLE_ADMIN".equals(target.getRole())) {
+//                throw new RuntimeException("Manager cannot update admin profile");
+//            }
+//
+//            // Manager can update only self or USER
+//            if (!loggedInUsername.equals(target.getUsername()) && !"ROLE_USER".equals(target.getRole())) {
+//                throw new RuntimeException("Access denied");
+//            }
+//        }
+//
+//        // ✅ Update username
+//        if (request.getUsername() != null && !request.getUsername().isBlank()
+//                && !request.getUsername().equals(target.getUsername())) {
+//
+//            // Check if username already exists
+//            if (adminRepository.existsByUsername(request.getUsername())) {
+//                throw new RuntimeException("Username already taken");
+//            }
+//
+//            target.setUsername(request.getUsername());
+//        }
+//
+//        // ✅ Update password
+//        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+//            target.setPassword(passwordEncoder.encode(request.getPassword()));
+//        }
+//
+//        // ✅ Update role (optional)
+//        if (request.getRole() != null && !request.getRole().isBlank()) {
+//            target.setRole(request.getRole());
+//        }
+//
+//        Admin updated = adminRepository.save(target);
+//        return toResponse(updated);
+//    }
+//    @Override
+//    public AdminResponse updateAdmin(AdminRequest request) {
+//        // 1. firstly check exist or not
+//        Admin admin = adminRepository.findByUsername(request.getUsername())
+//                .orElseThrow(() -> new RuntimeException(
+//                        "Admin with username " + request.getUsername() + " not found"));
+//
+//
+//        if(request.getPassword() != null && !request.getPassword().isBlank()) {
+//            admin.setPassword(passwordEncoder.encode(request.getPassword()));
+//        }
+//
+//        Admin updated = adminRepository.save(admin);
+//
+//        return toResponse(updated);
+//    }
     @Override
     public void deleteAdmin(Long id) {
         Admin admin = adminRepository.findById(id)

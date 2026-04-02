@@ -35,12 +35,14 @@ public class ClickupConfigService {
             ClickupConfig c = getConfig();
             return c.getToken() != null
                     && c.getTeamId() != null
-                    && c.getListId() != null; // final required
+                    && c.getSpaceId() != null
+                    && !c.getSpaceId().isBlank()
+                    && c.getListId() != null
+                    && !c.getListId().isBlank();
         } catch (Exception e) {
             return false;
         }
     }
-
     public void saveConfig(ClickupConfig config) {
         repo.save(config);
     }
@@ -103,13 +105,81 @@ public class ClickupConfigService {
 
     public void selectSpace(String spaceId) {
         ClickupConfig config = getConfig();
+
+        if (config.getId() == null) {
+            throw new RuntimeException("Config not initialized properly");
+        }
+
         config.setSpaceId(spaceId);
         repo.save(config);
     }
 
     public void selectList(String listId) {
         ClickupConfig config = getConfig();
+
+        if (config.getId() == null) {
+            throw new RuntimeException("Config not initialized properly");
+        }
+
         config.setListId(listId);
         repo.save(config);
+    }
+
+    public Object updateSpace(String spaceId, String name) {
+        ClickupConfig config = getConfig();
+        String token = AESUtil.decrypt(config.getToken());
+
+        ClickupContext.setToken(token);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+
+        try {
+            return clickupClient.updateSpace(spaceId, body);
+        } finally {
+            ClickupContext.clear();
+        }
+    }
+
+    public Object deleteSpace(String spaceId) {
+        ClickupConfig config = getConfig();
+        String token = AESUtil.decrypt(config.getToken());
+
+        ClickupContext.setToken(token);
+
+        try {
+            return clickupClient.deleteSpace(spaceId);
+        } finally {
+            ClickupContext.clear();
+        }
+    }
+
+    public Object updateList(String listId, String name) {
+        ClickupConfig config = getConfig();
+        String token = AESUtil.decrypt(config.getToken());
+
+        ClickupContext.setToken(token);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+
+        try {
+            return clickupClient.updateList(listId, body);
+        } finally {
+            ClickupContext.clear();
+        }
+    }
+
+    public Object deleteList(String listId) {
+        ClickupConfig config = getConfig();
+        String token = AESUtil.decrypt(config.getToken());
+
+        ClickupContext.setToken(token);
+
+        try {
+            return clickupClient.deleteList(listId);
+        } finally {
+            ClickupContext.clear();
+        }
     }
 }

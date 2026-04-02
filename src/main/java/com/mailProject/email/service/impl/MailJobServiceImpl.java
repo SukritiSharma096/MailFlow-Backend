@@ -47,10 +47,11 @@ public class MailJobServiceImpl implements MailJobService {
         boolean anyFailure = false;
 
         if (!clickupConfigService.isConfigured()) {
-            log.warn("ClickUp not configured. Skipping job...");
+            log.warn("ClickUp not fully configured (Space/List missing)");
 
             history.setStatus("FAILED");
             history.setEndTime(LocalDateTime.now());
+            history.setErrorMessage("ClickUp Space/List not selected");
             historyRepo.save(history);
             return;
         }
@@ -71,9 +72,8 @@ public class MailJobServiceImpl implements MailJobService {
 
                 for (MultipleEmailAccounts account : accounts) {
 
-                    totalTasks += processingService.processNewMails(account.getId());
+                    totalTasks += processingService.processNewMails(account.getId(), true);
                 }
-
             } catch (Exception e) {
                 anyFailure = true;
                 log.error("Error in job execution: {}", e.getMessage(), e);

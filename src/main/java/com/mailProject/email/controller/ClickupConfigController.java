@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -18,12 +19,7 @@ public class ClickupConfigController {
 
     @PostMapping("/config")
     public ResponseEntity<?> saveConfig(@RequestBody Map<String, String> req) {
-
-        service.save(
-                req.get("token"),
-                req.get("teamId")
-        );
-
+        service.save(req.get("token"), req.get("teamId"));
         return ResponseEntity.ok("Saved");
     }
 
@@ -65,13 +61,42 @@ public class ClickupConfigController {
     public ResponseEntity<?> getConfig() {
         ClickupConfig config = service.getConfig();
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "teamId", config.getTeamId(),
-                        "spaceId", config.getSpaceId(),
-                        "listId", config.getListId(),
-                        "configured", true
-                )
-        );
+        Map<String, Object> res = new HashMap<>();
+        res.put("teamId", config.getTeamId());
+        res.put("spaceId", config.getSpaceId());
+        res.put("listId", config.getListId());
+        res.put("configured", true);
+
+        return ResponseEntity.ok(res);
+    }
+
+    // UPDATE SPACE
+    @PutMapping("/space/{id}")
+    public ResponseEntity<?> updateSpace(@PathVariable String id,
+                                         @RequestBody Map<String, String> req) {
+        return ResponseEntity.ok(service.updateSpace(id, req.get("name")));
+    }
+
+    // DELETE SPACE
+    @DeleteMapping("/dlt/space/{id}")
+    public ResponseEntity<?> deleteSpace(@PathVariable String id) {
+        service.deleteSpace(id);
+        return ResponseEntity.ok("Deleted");
+    }
+
+
+    // UPDATE LIST
+    @PutMapping("/list/{id}")
+    public ResponseEntity<?> updateList(@PathVariable String id,
+                                        @RequestBody Map<String, String> req) {
+        return ResponseEntity.ok(service.updateList(id, req.get("name")));
+    }
+
+    // DELETE LIST
+    @DeleteMapping("/dlt/list/{id}")
+    public ResponseEntity<?> deleteList(@PathVariable String id) {
+        service.deleteList(id);
+        return ResponseEntity.ok("Deleted");
+
     }
 }

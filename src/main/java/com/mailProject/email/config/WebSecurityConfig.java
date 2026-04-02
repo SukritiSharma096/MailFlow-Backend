@@ -47,7 +47,7 @@ public class WebSecurityConfig {
             "/api/clickup/status",   "/api/clickup/config",
             "/api/clickup/create-space",
             "/api/clickup/status", "/api/clickup/spaces/**",
-            "/api/clickup/list", "/api/clickup/select-space","/api/clickup/select-list",
+            "/api/clickup/list", "/api/clickup/select-space","/api/clickup/select-list","/api/clickup/list/**","/api/clickup/space/**","/api/clickup/dlt/list/**","/api/clickup/dlt/space/**"
     };
 
     @Bean

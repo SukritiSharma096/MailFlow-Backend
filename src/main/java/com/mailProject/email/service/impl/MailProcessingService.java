@@ -33,55 +33,94 @@ public class MailProcessingService {
     private final ClickupConfigService clickupConfigService;
 
     @Transactional
-    public int processNewMails(Long accountId) throws Exception {
+    public int processNewMails(Long accountId, boolean fetchInbox) throws Exception {
+
         if (!clickupConfigService.isConfigured()) {
             log.warn("ClickUp not configured for account {}", accountId);
             return 0;
         }
 
-        emailService.fetchInbox(accountId);
-        List<ReceivedEmails> newMails = receiveRepo.findByAccountIdAndTaskCreatedFalse(accountId);
+        if (fetchInbox) {
+            emailService.fetchInbox(accountId);
+        }
+
+        List<ReceivedEmails> newMails =
+                receiveRepo.findTop50ByAccountIdAndTaskCreatedFalse(accountId);
+
         int count = 0;
 
         for (ReceivedEmails mail : newMails) {
+
             try {
                 ClickupConfig config = clickupConfigService.getConfig();
-                String token = AESUtil.decrypt(config.getToken());
-                String listId = config.getListId();
 
-                if (listId == null || listId.isBlank()) {
-                    log.warn("ListId missing, skipping task creation");
-                    continue;
+                String listId = config.getListId();
+                if (config.getSpaceId() == null || config.getSpaceId().isBlank()) {
+                    throw new RuntimeException("❌ ClickUp Space not selected");
                 }
 
+                if (config.getListId() == null || config.getListId().isBlank()) {
+                    throw new RuntimeException("❌ ClickUp List not selected");
+                }
+
+                String token = AESUtil.decrypt(config.getToken());
                 ClickupContext.setToken(token);
 
                 TaskRequest req = new TaskRequest();
-                req.setName(mail.getSubject() != null && !mail.getSubject().isBlank()
-                        ? mail.getSubject()
-                        : "(No Subject)");
+                req.setName(
+                        mail.getSubject() != null && !mail.getSubject().isBlank()
+                                ? mail.getSubject()
+                                : "(No Subject)"
+                );
 
                 String cleanBody = mail.getBody() != null
                         ? org.jsoup.Jsoup.parse(mail.getBody()).text()
                         : "";
 
-                if (cleanBody.length() > 3000) cleanBody = cleanBody.substring(0, 3000);
+                if (cleanBody.length() > 3000)
+                    cleanBody = cleanBody.substring(0, 3000);
 
-                req.setDescription("📩 Account ID: " + accountId +
-                        "\n📩 Sender: " + mail.getSender() +
-                        "\n🕒 Date: " + mail.getSentAt() +
-                        "\n\n" + cleanBody);
-
-                TaskResponse response = clickupClient.createTask(listId, req);
-
-                uploadAttachments(response.getId(), mail);
+                req.setDescription(
+                        "📩 Account ID: " + accountId +
+                                "\n📩 Sender: " + mail.getSender() +
+                                "\n🕒 Date: " + mail.getSentAt() +
+                                "\n\n" + cleanBody
+                );
 
                 mail.setTaskCreated(true);
                 receiveRepo.save(mail);
-                count++;
 
-            } catch (Exception e) {
-                log.error("Error processing mail id {}: {}", mail.getId(), e.getMessage(), e);
+                try {
+                    TaskResponse response = clickupClient.createTask(listId, req);
+
+                    uploadAttachments(response.getId(), mail);
+
+                    count++;
+
+                } catch (Exception e) {
+
+                    if (e.getMessage() != null && e.getMessage().contains("List deleted")) {
+
+                        log.error("❌ ClickUp list deleted!");
+
+                        config.setListId(null);
+                        clickupConfigService.saveConfig(config);
+
+                        throw new RuntimeException("Selected ClickUp list is deleted. Please reconfigure.");
+                    }
+
+                    else if (e.getMessage() != null && e.getMessage().contains("duplicate")) {
+                        log.warn("Duplicate ignored for mail {}", mail.getId());
+                    }
+
+                    else {
+                        log.error("Error mail {}: {}", mail.getId(), e.getMessage());
+
+                        mail.setTaskCreated(false);
+                        receiveRepo.save(mail);
+                    }
+                }
+
             } finally {
                 ClickupContext.clear();
             }
@@ -94,11 +133,13 @@ public class MailProcessingService {
         if (mail.getAttachments() == null || mail.getAttachments().isEmpty()) return;
 
         String[] files = mail.getAttachments().split(",");
+
         for (String fileName : files) {
             try {
                 File file = new File("email_attachments/" + fileName);
+
                 if (!file.exists()) {
-                    log.warn("Attachment file not found: {}", file.getAbsolutePath());
+                    log.warn("Attachment not found: {}", file.getAbsolutePath());
                     continue;
                 }
 
@@ -110,8 +151,9 @@ public class MailProcessingService {
                 );
 
                 clickupClient.uploadAttachment(taskId, multipartFile);
+
             } catch (Exception e) {
-                log.error("Attachment upload failed for mail id: {}. Error: {}", mail.getId(), e.getMessage());
+                log.error("Attachment upload failed for mail {}: {}", mail.getId(), e.getMessage());
             }
         }
     }

@@ -49,4 +49,19 @@ public interface ClickupClient {
             @PathVariable String taskId,
             @RequestPart("attachment") MultipartFile file
     );
+
+    @PutMapping("/space/{space_id}")
+    Object updateSpace(@PathVariable("space_id") String spaceId,
+                       @RequestBody Map<String, Object> body);
+
+    @DeleteMapping("/space/{space_id}")
+    Object deleteSpace(@PathVariable("space_id") String spaceId);
+
+
+    @PutMapping("/list/{list_id}")
+    Object updateList(@PathVariable("list_id") String listId,
+                      @RequestBody Map<String, Object> body);
+
+    @DeleteMapping("/list/{list_id}")
+    Object deleteList(@PathVariable("list_id") String listId);
 }

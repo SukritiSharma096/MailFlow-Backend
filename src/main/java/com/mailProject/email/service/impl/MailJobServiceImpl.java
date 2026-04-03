@@ -47,7 +47,6 @@ public class MailJobServiceImpl implements MailJobService {
         boolean anyFailure = false;
 
         if (!clickupConfigService.isConfigured()) {
-            log.warn("ClickUp not fully configured (Space/List missing)");
 
             history.setStatus("FAILED");
             history.setEndTime(LocalDateTime.now());
@@ -92,9 +91,7 @@ public class MailJobServiceImpl implements MailJobService {
         } else {
             history.setStatus("NO_NEW_MAILS");
         }
-
         history.setEndTime(LocalDateTime.now());
-
         historyRepo.save(history);
     }
 

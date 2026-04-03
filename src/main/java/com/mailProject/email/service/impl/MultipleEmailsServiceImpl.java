@@ -214,7 +214,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         Transport.send(message);
 
-        // 🔥 ADD THIS BLOCK
         SentMails sentMail = new SentMails();
         sentMail.setAccountId(accountId);
         sentMail.setToEmails(String.join(",", request.getTo()));
@@ -778,7 +777,6 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             subject = sentEmail.getSubject();
             body = sentEmail.getBody();
             attachments = sentEmail.getAttachments();
-            // sent mail me inlineImages usually nahi hote
         }
         Session smtpSession = createSmtpSession(acc);
 

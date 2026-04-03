@@ -4,6 +4,9 @@ import com.mailProject.email.dto.TaskRequest;
 import com.mailProject.email.dto.TaskResponse;
 import com.mailProject.email.entity.ClickupConfig;
 import com.mailProject.email.entity.ReceivedEmails;
+import com.mailProject.email.exception.ClickupListDeletedException;
+import com.mailProject.email.exception.ClickupListNotSelectedException;
+import com.mailProject.email.exception.ClickupSpaceNotSelectedException;
 import com.mailProject.email.feignInterface.ClickupClient;
 import com.mailProject.email.repository.ReceiveEmailRepository;
 import com.mailProject.email.security.AESUtil;
@@ -56,11 +59,11 @@ public class MailProcessingService {
 
                 String listId = config.getListId();
                 if (config.getSpaceId() == null || config.getSpaceId().isBlank()) {
-                    throw new RuntimeException("❌ ClickUp Space not selected");
+                    throw new ClickupSpaceNotSelectedException("ClickUp Space not selected");
                 }
 
                 if (config.getListId() == null || config.getListId().isBlank()) {
-                    throw new RuntimeException("❌ ClickUp List not selected");
+                    throw new ClickupListNotSelectedException("ClickUp List not selected");
                 }
 
                 String token = AESUtil.decrypt(config.getToken());
@@ -81,9 +84,9 @@ public class MailProcessingService {
                     cleanBody = cleanBody.substring(0, 3000);
 
                 req.setDescription(
-                        "📩 Account ID: " + accountId +
-                                "\n📩 Sender: " + mail.getSender() +
-                                "\n🕒 Date: " + mail.getSentAt() +
+                        " Account ID: " + accountId +
+                                "\nSender: " + mail.getSender() +
+                                "\nDate: " + mail.getSentAt() +
                                 "\n\n" + cleanBody
                 );
 
@@ -101,12 +104,12 @@ public class MailProcessingService {
 
                     if (e.getMessage() != null && e.getMessage().contains("List deleted")) {
 
-                        log.error("❌ ClickUp list deleted!");
+                        log.error(" ClickUp list deleted!");
 
                         config.setListId(null);
                         clickupConfigService.saveConfig(config);
 
-                        throw new RuntimeException("Selected ClickUp list is deleted. Please reconfigure.");
+                        throw new ClickupListDeletedException("Selected ClickUp list is deleted. Please reconfigure.");
                     }
 
                     else if (e.getMessage() != null && e.getMessage().contains("duplicate")) {

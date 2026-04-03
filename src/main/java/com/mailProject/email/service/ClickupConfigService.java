@@ -1,6 +1,8 @@
 package com.mailProject.email.service;
 
 import com.mailProject.email.entity.ClickupConfig;
+import com.mailProject.email.exception.ClickupConfigNotFoundException;
+import com.mailProject.email.exception.InvalidConfigException;
 import com.mailProject.email.feignInterface.ClickupClient;
 import com.mailProject.email.repository.ClickupConfigRepository;
 import com.mailProject.email.security.AESUtil;
@@ -20,7 +22,7 @@ public class ClickupConfigService {
 
     public ClickupConfig getConfig() {
         return repo.findTopByOrderByIdDesc()
-                .orElseThrow(() -> new RuntimeException("ClickUp config not found"));
+                .orElseThrow(() -> new ClickupConfigNotFoundException("ClickUp config not found"));
     }
 
     public void save(String token, String teamId) {
@@ -39,7 +41,7 @@ public class ClickupConfigService {
                     && !c.getSpaceId().isBlank()
                     && c.getListId() != null
                     && !c.getListId().isBlank();
-        } catch (Exception e) {
+        } catch (ClickupConfigNotFoundException e) {
             return false;
         }
     }
@@ -107,7 +109,7 @@ public class ClickupConfigService {
         ClickupConfig config = getConfig();
 
         if (config.getId() == null) {
-            throw new RuntimeException("Config not initialized properly");
+            throw new InvalidConfigException("Config not initialized properly");
         }
 
         config.setSpaceId(spaceId);
@@ -118,7 +120,7 @@ public class ClickupConfigService {
         ClickupConfig config = getConfig();
 
         if (config.getId() == null) {
-            throw new RuntimeException("Config not initialized properly");
+            throw new InvalidConfigException("Config not initialized properly");
         }
 
         config.setListId(listId);

@@ -1,4 +1,6 @@
+
 package com.mailProject.email.security;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -7,12 +9,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,9 +41,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String username = jwtUtil.extractUsername(token);
 
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    // JWT roles
-                    List<SimpleGrantedAuthority> authorities = jwtUtil.extractRoles(token).stream()
-                            .map(SimpleGrantedAuthority::new) // Use exact DB role
+                    List<String> roles = jwtUtil.extractRoles(token);
+
+                    if (roles == null) {
+                        roles = Collections.emptyList(); 
+                    }
+                    List<SimpleGrantedAuthority> authorities = roles.stream()
+                            .map(SimpleGrantedAuthority::new)
                             .collect(Collectors.toList());
 
                     UsernamePasswordAuthenticationToken authToken =

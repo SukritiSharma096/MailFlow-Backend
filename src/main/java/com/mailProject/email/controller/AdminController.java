@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -37,10 +38,10 @@ public class AdminController {
         }
 
         String token = authHeader.substring(7);
-        String loggedInRole  = jwtUtil.extractRoles(token).get(0); // e.g., ROLE_ADMIN
+        String loggedInRole  = jwtUtil.extractRoles(token).get(0);
 
         if ("ROLE_MANAGER".equals(loggedInRole) && !"USER".equalsIgnoreCase(request.getRole())) {
-            return ResponseEntity.status(403).body("Manager can create only USER");
+            return ResponseEntity.status(401).body("Manager can create only USER");
         }
         return ResponseEntity.ok(adminService.createAdmin(request));
     }
@@ -77,14 +78,31 @@ public class AdminController {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(401).body("Unauthorized");
         }
+        return ResponseEntity.ok(adminService.getAllAdmins());
+    }
+
+    @GetMapping("/get/{id}")
+    public ResponseEntity<?> getAdminById(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+
+        String authHeader = httpRequest.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
 
         String token = authHeader.substring(7);
         String role = jwtUtil.extractRoles(token).get(0);
 
-        if (!role.equals("ROLE_ADMIN")) {
-            return ResponseEntity.status(403).body("Only ADMIN can view all users");
+        if (!role.equals("ROLE_ADMIN") && !role.equals("ROLE_MANAGER")) {
+            return ResponseEntity.status(401).body("Access denied");
         }
-        return ResponseEntity.ok(adminService.getAllAdmins());
+
+        AdminResponse admin = adminService.getAdminById(id);
+        if (admin == null) {
+            return ResponseEntity.status(404).body("User not found");
+        }
+        return ResponseEntity.ok(admin);
     }
     @PutMapping("/update/{id}")
     public ResponseEntity<?> updateAdmin(
@@ -118,6 +136,6 @@ public class AdminController {
             return ResponseEntity.status(403).body("Only ADMIN can delete users");
         }
         adminService.deleteAdmin(id);
-        return ResponseEntity.ok("User deleted successfully");
+        return ResponseEntity.ok(Map.of("message", "User deleted"));
     }
 }

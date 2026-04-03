@@ -21,19 +21,25 @@ public class JwtUtil {
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
     }
-
     public String generateToken(String username, List<String> roles) {
         List<String> prefixedRoles = roles.stream()
                 .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
                 .toList();
         return Jwts.builder()
                 .setSubject(username)
-                .claim("roles", roles)
+                .claim("roles", prefixedRoles)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
+public List<String> extractRoles(String token) {
+    Object roles = getClaims(token).get("roles");
+    if (roles == null) return List.of(); // empty list
+    return ((List<?>) roles).stream()
+            .map(Object::toString)
+            .toList();
+}
     private Claims getClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
@@ -44,9 +50,6 @@ public class JwtUtil {
 
     public String extractUsername(String token) {
         return getClaims(token).getSubject();
-    }
-    public List<String> extractRoles(String token) {
-        return getClaims(token).get("roles", List.class);
     }
 
     public boolean isTokenValid(String token) {
@@ -64,7 +67,7 @@ public class JwtUtil {
             String token = authHeader.substring(7);
             return extractUsername(token);
         }
-        return null; // Unauthorized or no token
+        return null;
     }
 
     public List<String> extractRolesFromRequest(HttpServletRequest request) {

@@ -12,10 +12,10 @@ public interface AdminService {
 
     AdminResponse getAdminByUsername(String username);
     List<AdminResponse> getAllAdmins();
-//    AdminResponse updateAdmin(AdminRequest request);
     void deleteAdmin(Long id);
     AdminResponse updateAdmin(Long id,
                               AdminRequest request,
                               String loggedInUsername,
                               String role);
+    AdminResponse getAdminById(Long id);
 }

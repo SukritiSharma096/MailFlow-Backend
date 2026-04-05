@@ -73,6 +73,9 @@ public class AdminServiceImpl implements AdminService {
     }
     @Override
     public AdminResponse updateAdmin(Long id, AdminRequest request, String loggedInUsername, String role) {
+        if ("USER".equals(role)) {
+            throw new RuntimeException("USER cannot update anyone");
+        }
 
         Admin target = adminRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));

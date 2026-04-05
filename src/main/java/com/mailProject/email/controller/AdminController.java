@@ -38,10 +38,20 @@ public class AdminController {
         }
 
         String token = authHeader.substring(7);
-        String loggedInRole  = jwtUtil.extractRoles(token).get(0);
+        String loggedInRole = jwtUtil.extractRoles(token).get(0);
 
-        if ("ROLE_MANAGER".equals(loggedInRole) && !"USER".equalsIgnoreCase(request.getRole())) {
-            return ResponseEntity.status(401).body("Manager can create only USER");
+        switch (loggedInRole) {
+            case "ROLE_USER":
+                return ResponseEntity.status(403).body("USER cannot create anyone");
+            case "ROLE_MANAGER":
+                if (!"USER".equalsIgnoreCase(request.getRole())) {
+                    return ResponseEntity.status(403).body("Manager can create only USER");
+                }
+                break;
+            case "ROLE_ADMIN":
+                break;
+            default:
+                return ResponseEntity.status(403).body("Forbidden");
         }
         return ResponseEntity.ok(adminService.createAdmin(request));
     }

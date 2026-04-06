@@ -46,23 +46,30 @@ public class MailProcessingService {
                 receiveRepo.findTop50ByAccountIdAndTaskCreatedFalseAndProcessingFalse(accountId);
 
         if (newMails.isEmpty()) return 0;
+
         ClickupConfig global = clickupConfigService.getGlobal();
         var mapping = clickupConfigService.getAccountConfig(accountId);
         String token = AESUtil.decrypt(global.getToken());
+
+        // 🔥 thread-safe counter
         java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger(0);
 
         newMails.parallelStream().forEach(mail -> {
             try {
+                // 🔥 set token per thread
                 ClickupContext.setToken(token);
+
+                // mark processing
                 mail.setProcessing(true);
                 receiveRepo.save(mail);
-                String[] receiverList = mail.getReceivers() != null
-                        ? mail.getReceivers().split(",")
-                        : new String[]{};
 
-                if (receiverList.length == 0) {
-                    receiverList = new String[]{"UNKNOWN"};
-                }
+                TaskRequest req = new TaskRequest();
+
+                req.setName(
+                        mail.getSubject() != null && !mail.getSubject().isBlank()
+                                ? mail.getSubject()
+                                : "(No Subject)"
+                );
 
                 String cleanBody = mail.getBody() != null
                         ? org.jsoup.Jsoup.parse(mail.getBody()).text()
@@ -72,32 +79,23 @@ public class MailProcessingService {
                     cleanBody = cleanBody.substring(0, 3000);
                 }
 
-                for (String receiver : receiverList) {
+                req.setDescription(
+                        "Account ID: " + accountId +
+                                "\nSender: " + mail.getSender() +
+                                "\n\n" + cleanBody
+                );
 
-                    TaskRequest req = new TaskRequest();
+                TaskResponse response =
+                        clickupClient.createTask(mapping.getListId(), req);
 
-                    req.setName(
-                            mail.getSubject() != null && !mail.getSubject().isBlank()
-                                    ? mail.getSubject()
-                                    : "(No Subject)"
-                    );
-
-                    req.setDescription(
-                            "Account ID: " + accountId +
-                                    "\nSender: " + mail.getSender() +
-                                    "\nReceiver: " + receiver.trim() +
-                                    "\n\n" + cleanBody
-                    );
-
-                    TaskResponse response =
-                            clickupClient.createTask(mapping.getListId(), req);
-                    uploadAttachments(response.getId(), mail);
-                    count.incrementAndGet();
-                }
+                uploadAttachments(response.getId(), mail);
 
                 mail.setTaskCreated(true);
                 mail.setProcessing(false);
                 receiveRepo.save(mail);
+
+                // ✅ increment count safely
+                count.incrementAndGet();
 
             } catch (Exception e) {
 

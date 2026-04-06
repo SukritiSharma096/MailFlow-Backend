@@ -1,6 +1,5 @@
 package com.mailProject.email.controller;
 
-import com.mailProject.email.entity.ClickupConfig;
 import com.mailProject.email.service.ClickupConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,10 +16,10 @@ public class ClickupConfigController {
 
     private final ClickupConfigService service;
 
-    @PostMapping("/config")
-    public ResponseEntity<?> saveConfig(@RequestBody Map<String, String> req) {
-        service.save(req.get("token"), req.get("teamId"));
-        return ResponseEntity.ok("Saved");
+    @PostMapping("/global-config")
+    public ResponseEntity<?> saveGlobal(@RequestBody Map<String,String> req) {
+        service.saveGlobalConfig(req.get("token"), req.get("teamId"));
+        return ResponseEntity.ok("Global Config Saved");
     }
 
     @GetMapping("/spaces")
@@ -29,14 +28,23 @@ public class ClickupConfigController {
     }
 
     @PostMapping("/space")
-    public ResponseEntity<?> createSpace(@RequestBody Map<String, String> req) {
+    public ResponseEntity<?> createSpace(@RequestBody Map<String,String> req) {
         return ResponseEntity.ok(service.createSpace(req.get("name")));
     }
 
-    @PostMapping("/select-space")
-    public ResponseEntity<?> selectSpace(@RequestBody Map<String, String> req) {
-        service.selectSpace(req.get("spaceId"));
-        return ResponseEntity.ok("Space Selected");
+    @PutMapping("/space/{spaceId}")
+    public ResponseEntity<?> updateSpace(
+            @PathVariable String spaceId,
+            @RequestBody Map<String,String> req) {
+
+        return ResponseEntity.ok(
+                service.updateSpace(spaceId, req.get("name"))
+        );
+    }
+
+    @DeleteMapping("/space/{spaceId}")
+    public ResponseEntity<?> deleteSpace(@PathVariable String spaceId) {
+        return ResponseEntity.ok(service.deleteSpace(spaceId));
     }
 
     @GetMapping("/lists/{spaceId}")
@@ -45,53 +53,46 @@ public class ClickupConfigController {
     }
 
     @PostMapping("/list")
-    public ResponseEntity<?> createList(@RequestBody Map<String, String> req) {
+    public ResponseEntity<?> createList(@RequestBody Map<String,String> req) {
         return ResponseEntity.ok(
                 service.createList(req.get("spaceId"), req.get("name"))
         );
     }
 
-    @PostMapping("/select-list")
-    public ResponseEntity<?> selectList(@RequestBody Map<String, String> req) {
-        service.selectList(req.get("listId"));
-        return ResponseEntity.ok("List Selected");
+    @PutMapping("/list/{listId}")
+    public ResponseEntity<?> updateList(
+            @PathVariable String listId,
+            @RequestBody Map<String,String> req) {
+
+        return ResponseEntity.ok(
+                service.updateList(listId, req.get("name"))
+        );
     }
 
-    @GetMapping("/config")
-    public ResponseEntity<?> getConfig() {
-        ClickupConfig config = service.getConfig();
-
-        Map<String, Object> res = new HashMap<>();
-        res.put("teamId", config.getTeamId());
-        res.put("spaceId", config.getSpaceId());
-        res.put("listId", config.getListId());
-        res.put("configured", true);
-
-        return ResponseEntity.ok(res);
+    @DeleteMapping("/list/{listId}")
+    public ResponseEntity<?> deleteList(@PathVariable String listId) {
+        return ResponseEntity.ok(service.deleteList(listId));
     }
 
-    @PutMapping("/space/{id}")
-    public ResponseEntity<?> updateSpace(@PathVariable String id,
-                                         @RequestBody Map<String, String> req) {
-        return ResponseEntity.ok(service.updateSpace(id, req.get("name")));
+    @PostMapping("/account-config/{accountId}")
+    public ResponseEntity<?> saveAccountConfig(
+            @PathVariable Long accountId,
+            @RequestBody Map<String,String> req
+    ) {
+        service.saveAccountConfig(accountId, req.get("spaceId"), req.get("listId"));
+        return ResponseEntity.ok("Account Config Saved");
     }
 
-    @DeleteMapping("/dlt/space/{id}")
-    public ResponseEntity<?> deleteSpace(@PathVariable String id) {
-        service.deleteSpace(id);
-        return ResponseEntity.ok("Deleted");
-    }
-
-    @PutMapping("/list/{id}")
-    public ResponseEntity<?> updateList(@PathVariable String id,
-                                        @RequestBody Map<String, String> req) {
-        return ResponseEntity.ok(service.updateList(id, req.get("name")));
-    }
-
-    @DeleteMapping("/dlt/list/{id}")
-    public ResponseEntity<?> deleteList(@PathVariable String id) {
-        service.deleteList(id);
-        return ResponseEntity.ok("Deleted");
-
+    @GetMapping("/get-account-config/{accountId}")
+    public ResponseEntity<?> getAccountConfig(@PathVariable Long accountId) {
+        try {
+            var mapping = service.getAccountConfig(accountId);
+            Map<String, Object> res = new HashMap<>();
+            res.put("spaceId", mapping.getSpaceId());
+            res.put("listId", mapping.getListId());
+            return ResponseEntity.ok(res);
+        } catch (Exception e) {
+            return ResponseEntity.status(404).body("No config found");
+        }
     }
 }

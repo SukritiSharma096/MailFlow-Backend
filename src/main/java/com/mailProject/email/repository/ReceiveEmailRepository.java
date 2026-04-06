@@ -17,7 +17,6 @@ public interface ReceiveEmailRepository extends JpaRepository<ReceivedEmails, Lo
 
     List<ReceivedEmails> findTop20ByAccountIdAndFolderOrderBySentAtDesc(Long accountId, String folder);
 
-    List<ReceivedEmails> findByAccountIdAndTaskCreatedFalse(Long accountId);
+    List<ReceivedEmails> findTop50ByAccountIdAndTaskCreatedFalseAndProcessingFalse(Long accountId);
 
-    List<ReceivedEmails> findTop50ByAccountIdAndTaskCreatedFalse(Long accountId);
 }

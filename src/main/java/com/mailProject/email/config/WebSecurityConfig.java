@@ -40,14 +40,8 @@ public class WebSecurityConfig {
             "/api/schedulers/*",
             "/api/schedulers/*/toggle-status",
             "/api/schedulers/restart",
-            "/api/accounts/inbox/all", "/api/admin/create","/api/clickup/config","/api/clickup/status",    "/api/clickup/config",
-            "/api/clickup/create-space",
-            "/api/clickup/space",
-            "/api/clickup/lists/**",
-            "/api/clickup/status",   "/api/clickup/config",
-            "/api/clickup/create-space",
-            "/api/clickup/status", "/api/clickup/spaces/**",
-            "/api/clickup/list", "/api/clickup/select-space","/api/clickup/select-list","/api/clickup/list/**","/api/clickup/space/**","/api/clickup/dlt/list/**","/api/clickup/dlt/space/**"
+            "/api/accounts/inbox/all", "/api/admin/create","/api/clickup/global-config","/api/clickup/spaces","/api/clickup/space","/api/clickup/space/*","/api/clickup/space/*",
+            "/api/clickup/lists/*","/api/clickup/list","/api/clickup/list/*","/api/clickup/account-config/**","/api/clickup/get-account-config/**"
     };
 
     @Bean

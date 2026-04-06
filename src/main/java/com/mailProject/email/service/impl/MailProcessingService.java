@@ -4,16 +4,12 @@ import com.mailProject.email.dto.TaskRequest;
 import com.mailProject.email.dto.TaskResponse;
 import com.mailProject.email.entity.ClickupConfig;
 import com.mailProject.email.entity.ReceivedEmails;
-import com.mailProject.email.exception.ClickupListDeletedException;
-import com.mailProject.email.exception.ClickupListNotSelectedException;
-import com.mailProject.email.exception.ClickupSpaceNotSelectedException;
 import com.mailProject.email.feignInterface.ClickupClient;
 import com.mailProject.email.repository.ReceiveEmailRepository;
 import com.mailProject.email.security.AESUtil;
 import com.mailProject.email.security.ClickupContext;
 import com.mailProject.email.service.ClickupConfigService;
 import com.mailProject.email.service.MultipleEmailService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,10 +31,9 @@ public class MailProcessingService {
     private final ClickupClient clickupClient;
     private final ClickupConfigService clickupConfigService;
 
-    @Transactional
     public int processNewMails(Long accountId, boolean fetchInbox) throws Exception {
 
-        if (!clickupConfigService.isConfigured()) {
+        if (!clickupConfigService.isConfigured(accountId)) {
             log.warn("ClickUp not configured for account {}", accountId);
             return 0;
         }
@@ -48,91 +43,79 @@ public class MailProcessingService {
         }
 
         List<ReceivedEmails> newMails =
-                receiveRepo.findTop50ByAccountIdAndTaskCreatedFalse(accountId);
+                receiveRepo.findTop50ByAccountIdAndTaskCreatedFalseAndProcessingFalse(accountId);
 
-        int count = 0;
+        if (newMails.isEmpty()) return 0;
+        ClickupConfig global = clickupConfigService.getGlobal();
+        var mapping = clickupConfigService.getAccountConfig(accountId);
+        String token = AESUtil.decrypt(global.getToken());
+        java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger(0);
 
-        for (ReceivedEmails mail : newMails) {
-
+        newMails.parallelStream().forEach(mail -> {
             try {
-                ClickupConfig config = clickupConfigService.getConfig();
-
-                String listId = config.getListId();
-                if (config.getSpaceId() == null || config.getSpaceId().isBlank()) {
-                    throw new ClickupSpaceNotSelectedException("ClickUp Space not selected");
-                }
-
-                if (config.getListId() == null || config.getListId().isBlank()) {
-                    throw new ClickupListNotSelectedException("ClickUp List not selected");
-                }
-
-                String token = AESUtil.decrypt(config.getToken());
                 ClickupContext.setToken(token);
+                mail.setProcessing(true);
+                receiveRepo.save(mail);
+                String[] receiverList = mail.getReceivers() != null
+                        ? mail.getReceivers().split(",")
+                        : new String[]{};
 
-                TaskRequest req = new TaskRequest();
-                req.setName(
-                        mail.getSubject() != null && !mail.getSubject().isBlank()
-                                ? mail.getSubject()
-                                : "(No Subject)"
-                );
+                if (receiverList.length == 0) {
+                    receiverList = new String[]{"UNKNOWN"};
+                }
 
                 String cleanBody = mail.getBody() != null
                         ? org.jsoup.Jsoup.parse(mail.getBody()).text()
                         : "";
 
-                if (cleanBody.length() > 3000)
+                if (cleanBody.length() > 3000) {
                     cleanBody = cleanBody.substring(0, 3000);
+                }
 
-                req.setDescription(
-                        " Account ID: " + accountId +
-                                "\nSender: " + mail.getSender() +
-                                "\nDate: " + mail.getSentAt() +
-                                "\n\n" + cleanBody
-                );
+                for (String receiver : receiverList) {
+
+                    TaskRequest req = new TaskRequest();
+
+                    req.setName(
+                            mail.getSubject() != null && !mail.getSubject().isBlank()
+                                    ? mail.getSubject()
+                                    : "(No Subject)"
+                    );
+
+                    req.setDescription(
+                            "Account ID: " + accountId +
+                                    "\nSender: " + mail.getSender() +
+                                    "\nReceiver: " + receiver.trim() +
+                                    "\n\n" + cleanBody
+                    );
+
+                    TaskResponse response =
+                            clickupClient.createTask(mapping.getListId(), req);
+                    uploadAttachments(response.getId(), mail);
+                    count.incrementAndGet();
+                }
 
                 mail.setTaskCreated(true);
+                mail.setProcessing(false);
                 receiveRepo.save(mail);
 
-                try {
-                    TaskResponse response = clickupClient.createTask(listId, req);
+            } catch (Exception e) {
 
-                    uploadAttachments(response.getId(), mail);
+                mail.setProcessing(false);
+                receiveRepo.save(mail);
 
-                    count++;
-
-                } catch (Exception e) {
-
-                    if (e.getMessage() != null && e.getMessage().contains("List deleted")) {
-
-                        log.error(" ClickUp list deleted!");
-
-                        config.setListId(null);
-                        clickupConfigService.saveConfig(config);
-
-                        throw new ClickupListDeletedException("Selected ClickUp list is deleted. Please reconfigure.");
-                    }
-
-                    else if (e.getMessage() != null && e.getMessage().contains("duplicate")) {
-                        log.warn("Duplicate ignored for mail {}", mail.getId());
-                    }
-
-                    else {
-                        log.error("Error mail {}: {}", mail.getId(), e.getMessage());
-
-                        mail.setTaskCreated(false);
-                        receiveRepo.save(mail);
-                    }
-                }
+                log.error("Error processing mail {}: {}", mail.getId(), e.getMessage());
 
             } finally {
                 ClickupContext.clear();
             }
-        }
+        });
 
-        return count;
+        return count.get();
     }
 
     private void uploadAttachments(String taskId, ReceivedEmails mail) {
+
         if (mail.getAttachments() == null || mail.getAttachments().isEmpty()) return;
 
         String[] files = mail.getAttachments().split(",");

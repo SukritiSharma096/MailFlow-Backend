@@ -29,14 +29,14 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Something went wrong");
-        response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-
-        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+//    @ExceptionHandler(Exception.class)
+//    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
+//        Map<String, Object> response = new HashMap<>();
+//        response.put("message", "Something went wrong");
+//        response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+//
+//        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+//    }
 
     @ExceptionHandler(ClickupSpaceNotSelectedException.class)
     public ResponseEntity<Map<String, Object>> handleSpaceNotSelected(ClickupSpaceNotSelectedException ex) {

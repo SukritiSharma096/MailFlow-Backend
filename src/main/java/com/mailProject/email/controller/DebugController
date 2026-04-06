@@ -1,0 +1,21 @@
+package com.mailProject.email.controller;
+
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+@RestController
+public class DebugController {
+
+    @GetMapping("/debug")
+    public Map<String, String> debug(HttpServletRequest request) {
+        return Map.of(
+                "scheme", request.getScheme(),
+                "host", request.getHeader("host"),
+                "x-forwarded-proto", request.getHeader("x-forwarded-proto"),
+                "x-forwarded-host", request.getHeader("x-forwarded-host")
+        );
+    }
+}

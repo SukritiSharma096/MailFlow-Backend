@@ -14,6 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.mailProject.email.security.JwtAuthFilter;
+import org.springframework.web.filter.ForwardedHeaderFilter;
 
 @Configuration
 @EnableMethodSecurity
@@ -42,6 +43,23 @@ public class WebSecurityConfig {
             "/api/schedulers/restart",
             "/api/accounts/inbox/all", "/api/admin/create","/api/clickup/global-config","/api/clickup/spaces","/api/clickup/space","/api/clickup/space/*","/api/clickup/space/*",
             "/api/clickup/lists/*","/api/clickup/list","/api/clickup/list/*","/api/clickup/account-config/**","/api/clickup/get-account-config/**"
+            "api/admin/create"
+            // "/swagger-ui.html",
+            // "/swagger-ui/**",
+            // "/v3/api-docs/**",
+            // "/v3/api-docs",
+            // "/swagger-resources/**",
+            // "/webjars/**",
+            // "/api/accounts","/api/accounts", "/api/accounts/*", "/api/accounts/inbox/*", "/api/accounts/mail/attachments", "/api/accounts/inbox/db/*", "/api/accounts/inbox/fetch/**", "/api/accounts/email/**","/api/schedulers/**",
+            // "/api/accounts/*/send","/api/accounts/*/forward/**","/api/accounts/mail/attachments",
+            // "/api/accounts/sendWithAttachments/**", "/api/accounts/*/sent/**", "/api/accounts/*/sync","/api/accounts/*/delete/**","/api/accounts/*/forward/**","/api/accounts/*/sent/delete/**",
+            // "/api/jobs/run","/api/jobs/latest","/api/jobs/history",
+            // "/api/schedulers/save",
+            // "/api/schedulers/all",
+            // "/api/schedulers/*",
+            // "/api/schedulers/*/toggle-status",
+            // "/api/schedulers/restart",
+            // "/api/accounts/inbox/all", "/api/admin/create","/api/clickup/config","/api/clickup/status",
     };
 
     @Bean
@@ -72,5 +90,8 @@ public class WebSecurityConfig {
     public AuthenticationManager authenticationManagerBean(AuthenticationConfiguration builder) throws Exception {
         return builder.getAuthenticationManager();
     }
-
+@Bean
+public ForwardedHeaderFilter forwardedHeaderFilter() {
+    return new ForwardedHeaderFilter();
+}
 }

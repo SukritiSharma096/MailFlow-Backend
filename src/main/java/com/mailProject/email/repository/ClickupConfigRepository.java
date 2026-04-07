@@ -8,5 +8,5 @@ import java.util.Optional;
 
 public interface ClickupConfigRepository extends JpaRepository<ClickupConfig, Long> {
 
-    Optional<ClickupConfig> findByAdmin(Admin admin);
+    Optional<ClickupConfig> findTopByOrderByIdDesc();
 }

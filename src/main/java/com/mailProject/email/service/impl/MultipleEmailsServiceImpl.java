@@ -213,6 +213,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
         message.setText(request.getBody());
 
         Transport.send(message);
+
         SentMails sentMail = new SentMails();
         sentMail.setAccountId(accountId);
         sentMail.setToEmails(String.join(",", request.getTo()));

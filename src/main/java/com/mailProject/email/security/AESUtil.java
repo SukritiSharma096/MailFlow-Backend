@@ -5,7 +5,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
 public class AESUtil {
 
-    private static final String SECRET = "MySuperSecretKey"; // 16 char
+    private static final String SECRET = "MySuperSecretKey";
 
     public static String encrypt(String data) {
         try {

@@ -2,26 +2,23 @@ package com.mailProject.email.service.impl;
 
 import com.mailProject.email.dto.TaskRequest;
 import com.mailProject.email.dto.TaskResponse;
+import com.mailProject.email.entity.ClickupConfig;
 import com.mailProject.email.entity.ReceivedEmails;
 import com.mailProject.email.feignInterface.ClickupClient;
-import com.mailProject.email.repository.MailJobHistoryRepository;
-import com.mailProject.email.repository.MultipleEmailRepository;
 import com.mailProject.email.repository.ReceiveEmailRepository;
+import com.mailProject.email.security.AESUtil;
 import com.mailProject.email.security.ClickupContext;
 import com.mailProject.email.service.ClickupConfigService;
 import com.mailProject.email.service.MultipleEmailService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.mock.web.MockMultipartFile;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.file.Files;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -29,127 +26,119 @@ import java.util.List;
 @Slf4j
 public class MailProcessingService {
 
-    private final MultipleEmailRepository accountRepo;
     private final ReceiveEmailRepository receiveRepo;
     private final MultipleEmailService emailService;
     private final ClickupClient clickupClient;
-    private final MailJobHistoryRepository historyRepo;
+    private final ClickupConfigService clickupConfigService;
 
-    @Autowired
-    private ClickupConfigService clickupConfigService;
+    public int processNewMails(Long accountId, boolean fetchInbox) throws Exception {
 
-    @Transactional
-    public int processNewMails(Long accountId) throws Exception {
-
-        if (!clickupConfigService.isConfigured()) {
-            log.warn("ClickUp not configured for this admin. Skipping...");
+        if (!clickupConfigService.isConfigured(accountId)) {
+            log.warn("ClickUp not configured for account {}", accountId);
             return 0;
         }
 
-        LocalDateTime lastRun = historyRepo
-                .findTopByOrderByStartTimeDesc()
-                .map(h -> {
-                    log.info("Last job ended at: {}", h.getEndTime());
-                    return h.getEndTime();
-                })
-                .orElse(LocalDateTime.now().minusDays(7));
+        if (fetchInbox) {
+            emailService.fetchInbox(accountId);
+        }
 
         emailService.fetchInbox(accountId, 0, 100, "sentAt", "desc");
         List<ReceivedEmails> newMails =
-                receiveRepo.findByAccountIdAndTaskCreatedFalse(accountId);
+                receiveRepo.findTop50ByAccountIdAndTaskCreatedFalseAndProcessingFalse(accountId);
 
-        log.info("Found {} new mails to process for account {}", newMails.size(), accountId);
+        if (newMails.isEmpty()) return 0;
 
-        int count = 0;
+        ClickupConfig global = clickupConfigService.getGlobal();
+        var mapping = clickupConfigService.getAccountConfig(accountId);
+        String token = AESUtil.decrypt(global.getToken());
 
-        for (ReceivedEmails mail : newMails) {
+        // 🔥 thread-safe counter
+        java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger(0);
 
-            if (Boolean.TRUE.equals(mail.getTaskCreated())) {
-                log.info("Skipping mail id={} because task already created", mail.getId());
-                continue;
-            }
-
-            log.info("Processing mail id={}, subject={}", mail.getId(), mail.getSubject());
-
+        newMails.parallelStream().forEach(mail -> {
             try {
+                // 🔥 set token per thread
+                ClickupContext.setToken(token);
+
+                // mark processing
+                mail.setProcessing(true);
+                receiveRepo.save(mail);
+
                 TaskRequest req = new TaskRequest();
 
-                String subject = mail.getSubject() != null && !mail.getSubject().isBlank()
-                        ? mail.getSubject()
-                        : "(No Subject)";
+                req.setName(
+                        mail.getSubject() != null && !mail.getSubject().isBlank()
+                                ? mail.getSubject()
+                                : "(No Subject)"
+                );
 
-                req.setName(subject);
-                String cleanBody = "";
-                if (mail.getBody() != null) {
-                    cleanBody = org.jsoup.Jsoup.parse(mail.getBody()).text();
-                }
+                String cleanBody = mail.getBody() != null
+                        ? org.jsoup.Jsoup.parse(mail.getBody()).text()
+                        : "";
+
                 if (cleanBody.length() > 3000) {
                     cleanBody = cleanBody.substring(0, 3000);
                 }
-                String description =
-                        "📩 Account ID: " + accountId + "\n" +
-                        "📩 Sender: " + mail.getSender() + "\n" +
-                                "🕒 Date: " + mail.getSentAt() + "\n\n" +
-                                "----------------------------------\n\n" +
-                                cleanBody;
 
-                req.setDescription(description);
+                req.setDescription(
+                        "Account ID: " + accountId +
+                                "\nSender: " + mail.getSender() +
+                                "\n\n" + cleanBody
+                );
 
-                String token = clickupConfigService.getDecryptedToken();
-                String listId = clickupConfigService.getConfig().getListId();
-
-                ClickupContext.setToken(token);
-
-                TaskResponse response = clickupClient.createTask(listId, req);
-
-                ClickupContext.clear();
-                log.info("ClickUp task created successfully! Task ID={}", response.getId());
+                TaskResponse response =
+                        clickupClient.createTask(mapping.getListId(), req);
 
                 uploadAttachments(response.getId(), mail);
 
                 mail.setTaskCreated(true);
+                mail.setProcessing(false);
                 receiveRepo.save(mail);
 
-                count++;
+                // ✅ increment count safely
+                count.incrementAndGet();
 
             } catch (Exception e) {
-                log.error("❌ Failed to create ClickUp task for mail id {}: {}", mail.getId(), e.getMessage(), e);
-            }
-        }
 
-        log.info("Total ClickUp tasks created in this run: {}", count);
-        return count;
+                mail.setProcessing(false);
+                receiveRepo.save(mail);
+
+                log.error("Error processing mail {}: {}", mail.getId(), e.getMessage());
+
+            } finally {
+                ClickupContext.clear();
+            }
+        });
+
+        return count.get();
     }
 
     private void uploadAttachments(String taskId, ReceivedEmails mail) {
 
-        if (mail.getAttachments() == null || mail.getAttachments().isEmpty()) {
-            return;
-        }
+        if (mail.getAttachments() == null || mail.getAttachments().isEmpty()) return;
 
         String[] files = mail.getAttachments().split(",");
 
         for (String fileName : files) {
             try {
                 File file = new File("email_attachments/" + fileName);
+
                 if (!file.exists()) {
-                    log.warn("Attachment file not found: {}", file.getAbsolutePath());
+                    log.warn("Attachment not found: {}", file.getAbsolutePath());
                     continue;
                 }
 
-                MultipartFile multipartFile =
-                        new MockMultipartFile(
-                                file.getName(),
-                                file.getName(),
-                                Files.probeContentType(file.toPath()),
-                                new FileInputStream(file)
-                        );
+                MultipartFile multipartFile = new MockMultipartFile(
+                        file.getName(),
+                        file.getName(),
+                        Files.probeContentType(file.toPath()),
+                        new FileInputStream(file)
+                );
 
                 clickupClient.uploadAttachment(taskId, multipartFile);
-                log.info("Uploaded attachment {} for task {}", fileName, taskId);
 
             } catch (Exception e) {
-                log.error("Attachment upload failed for mail id: {}. Error: {}", mail.getId(), e.getMessage(), e);
+                log.error("Attachment upload failed for mail {}: {}", mail.getId(), e.getMessage());
             }
         }
     }

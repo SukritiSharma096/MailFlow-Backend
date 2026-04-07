@@ -9,13 +9,17 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "clickup_config")
-public class ClickupConfig {
+@Table(name = "clickup_account_mapping")
+public class ClickupAccountMapping {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String token;
-    private String teamId;
+    private String spaceId;
+    private String listId;
+
+    @ManyToOne
+    @JoinColumn(name = "account_id")
+    private MultipleEmailAccounts account;
 }

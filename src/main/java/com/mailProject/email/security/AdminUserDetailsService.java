@@ -3,11 +3,13 @@ package com.mailProject.email.security;
 import com.mailProject.email.entity.Admin;
 import com.mailProject.email.repository.AdminRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import java.util.List;
 
 @Service
 public class AdminUserDetailsService implements UserDetailsService {
@@ -26,7 +28,8 @@ public class AdminUserDetailsService implements UserDetailsService {
         return User.builder()
                 .username(admin.getUsername())
                 .password(admin.getPassword())
-                .roles(admin.getRole())
+                .authorities(List.of(new SimpleGrantedAuthority("ROLE_" + admin.getRole())))
+//                .authorities(admin.getRole())
                 .disabled(!admin.getActive())
                 .build();
     }

@@ -38,10 +38,6 @@ public class MailProcessingService {
             return 0;
         }
 
-        if (fetchInbox) {
-            emailService.fetchInbox(accountId);
-        }
-
         emailService.fetchInbox(accountId, 0, 100, "sentAt", "desc");
         List<ReceivedEmails> newMails =
                 receiveRepo.findTop50ByAccountIdAndTaskCreatedFalseAndProcessingFalse(accountId);

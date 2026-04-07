@@ -42,8 +42,8 @@ public class WebSecurityConfig {
             "/api/schedulers/*/toggle-status",
             "/api/schedulers/restart",
             "/api/accounts/inbox/all", "/api/admin/create","/api/clickup/global-config","/api/clickup/spaces","/api/clickup/space","/api/clickup/space/*","/api/clickup/space/*",
-            "/api/clickup/lists/*","/api/clickup/list","/api/clickup/list/*","/api/clickup/account-config/**","/api/clickup/get-account-config/**"
-            "api/admin/create"
+            "/api/clickup/lists/*","/api/clickup/list","/api/clickup/list/*","/api/clickup/account-config/**","/api/clickup/get-account-config/**",
+            "/api/admin/create"
             // "/swagger-ui.html",
             // "/swagger-ui/**",
             // "/v3/api-docs/**",

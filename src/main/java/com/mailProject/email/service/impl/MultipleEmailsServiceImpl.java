@@ -328,8 +328,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
-        if (size > 100) size = 100;
-
+        if (size > 50) size = 50; 
 
         int totalPages = (int) Math.ceil((double) totalMessages / size);
 
@@ -339,35 +338,55 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
             return buildEmptyResponse(page, size, totalMessages, totalPages);
         }
 
-
         int offset = page * size;
+
         int startIndex = Math.max(1, totalMessages - offset - size + 1);
         int endIndex = totalMessages - offset;
 
-
-        startIndex = Math.max(1, startIndex);
-        endIndex = Math.min(totalMessages, endIndex);
-
-
         Message[] messages = inbox.getMessages(startIndex, endIndex);
 
-        List<Message> messageList = new ArrayList<>(Arrays.asList(messages));
-
-        if ("desc".equalsIgnoreCase(direction)) {
-            Collections.reverse(messageList);
-        }
+        FetchProfile fp = new FetchProfile();
+        fp.add(FetchProfile.Item.ENVELOPE);
+        inbox.fetch(messages, fp);
 
         List<ReceiveEmailResponse> emailList = new ArrayList<>();
 
-        for (Message msg : messageList) {
+        for (Message msg : messages) {
             MimeMessage mimeMessage = (MimeMessage) msg;
             String messageId = mimeMessage.getMessageID();
 
-            ReceivedEmails email = receiveEmailRepository
-                    .findByMessageId(messageId)
-                    .orElseGet(() -> saveNewEmail(msg, messageId, accountId));
+            ReceivedEmails email = receiveEmailRepository.findByMessageId(messageId).orElse(null);
 
-            ReceiveEmailResponse dto = convertToDTO(email);
+            if (email == null) {
+                email = new ReceivedEmails();
+                email.setMessageId(messageId);
+                email.setSender(msg.getFrom() != null ? msg.getFrom()[0].toString() : null);
+                email.setSubject(msg.getSubject());
+
+                email.setSentAt(
+                        msg.getSentDate() != null
+                                ? msg.getSentDate().toInstant()
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDateTime()
+                                : null
+                );
+
+                email.setReceived(true);
+                email.setFolder("INBOX");
+                email.setAccountId(accountId);
+
+                email = receiveEmailRepository.save(email);
+            }
+
+            ReceiveEmailResponse dto = new ReceiveEmailResponse();
+            dto.setId(email.getId());
+            dto.setAccountId(email.getAccountId());
+            dto.setSender(email.getSender());
+            dto.setSubject(email.getSubject());
+            dto.setSentAt(email.getSentAt());
+            dto.setReceived(true);
+            dto.setFolder("INBOX");
+
             emailList.add(dto);
         }
 
@@ -380,7 +399,7 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
     private ReceivedEmails saveNewEmail(Message msg, String messageId, Long accountId) {
         Optional<ReceivedEmails> existing = receiveEmailRepository.findByMessageId(messageId);
         if (existing.isPresent()) {
-            return existing.get();  
+            return existing.get();
         }
 
         ReceivedEmails e = new ReceivedEmails();
@@ -1018,12 +1037,9 @@ public class MultipleEmailsServiceImpl implements MultipleEmailService {
 
         int totalElements = allEmails.size();
         int totalPages = (int) Math.ceil((double) totalElements / size);
-
-
         if (page >= totalPages && totalElements > 0) {
             return buildEmptyResponse(page, size, totalElements, totalPages);
         }
-
         int start = page * size;
         int end = Math.min(start + size, totalElements);
 

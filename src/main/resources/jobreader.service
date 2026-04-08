@@ -1,0 +1,17 @@
+[Unit]
+Description=JobReader Spring Boot App
+After=network.target
+
+[Service]
+User=tuespot
+WorkingDirectory=/opt/jar/jobreader
+
+# Dynamically find latest jar and run it
+ExecStart=/bin/bash -c 'exec /usr/bin/java -jar $(ls -t /opt/jar/jobreader/*.jar | head -n 1)'
+
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -4,29 +4,29 @@ pipeline {
     environment {
         APP_NAME = "jobreader"
         DEPLOY_PATH = "/opt/jar/jobreader"
-        BUILD_VERSION = "build-${BUILD_NUMBER}"
+        SERVICE_FILE = "jobreader.service"
+        BUILD_VERSION = "${BUILD_NUMBER}"
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                echo 'Checking out code from GitHub...'
+                echo 'Checking out code...'
                 checkout scm
             }
         }
 
         stage('Build') {
             steps {
-                echo "Building application with version: ${BUILD_VERSION}"
-                sh "mvn clean package -DskipTests"
+                echo "Building version: ${BUILD_VERSION}"
+                sh 'mvn clean package -DskipTests'
             }
         }
 
         stage('Prepare Artifact') {
             steps {
                 script {
-                    // Find generated JAR (excluding original plain jar if multiple)
                     def jarFile = sh(
                         script: "ls target/*.jar | grep -v 'original' | head -n 1",
                         returnStdout: true
@@ -34,41 +34,68 @@ pipeline {
 
                     echo "Found JAR: ${jarFile}"
 
-                    // Rename with build number
                     sh """
-                    cp ${jarFile} target/${APP_NAME}-${BUILD_VERSION}.jar
+                    cp ${jarFile} target/${APP_NAME}-build-${BUILD_VERSION}.jar
                     """
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy Service File') {
             steps {
-                echo "Deploying to ${DEPLOY_PATH}"
+                echo "Deploying service file..."
 
                 sh """
                 mkdir -p ${DEPLOY_PATH}
-                cp target/${APP_NAME}-${BUILD_VERSION}.jar ${DEPLOY_PATH}/
+
+                # Copy service file into jar folder
+                cp ${SERVICE_FILE} ${DEPLOY_PATH}/
+
+                # Link service file to systemd
+                sudo ln -sf ${DEPLOY_PATH}/${SERVICE_FILE} /etc/systemd/system/${APP_NAME}.service
+
+                # Reload systemd
+                sudo systemctl daemon-reload
                 """
             }
         }
 
-        stage('Restart Service') {
+        stage('Deploy Application') {
             steps {
-                echo "Restarting service..."
+                echo "Deploying application..."
+
                 sh """
-                sudo systemctl restart ${APP_NAME}
+                mkdir -p ${DEPLOY_PATH}
+
+                # Stop service
+                sudo systemctl stop ${APP_NAME}
+
+                # Remove old jar
+                rm -f ${DEPLOY_PATH}/*.jar
+
+                # Copy new jar
+                cp target/${APP_NAME}-build-${BUILD_VERSION}.jar ${DEPLOY_PATH}/
+
+                # Start service
+                sudo systemctl start ${APP_NAME}
                 """
+            }
+        }
+
+        stage('Verify Service') {
+            steps {
+                echo "Checking service status..."
+                sh "sudo systemctl status ${APP_NAME} --no-pager"
             }
         }
     }
 
     post {
         success {
-            echo "✅ Build ${BUILD_VERSION} deployed successfully!"
+            echo "✅ Deployment successful! Version: build-${BUILD_VERSION}"
         }
         failure {
-            echo "❌ Build failed!"
+            echo "❌ Deployment failed!"
         }
     }
 }

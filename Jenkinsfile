@@ -1,7 +1,14 @@
 pipeline {
     agent any
 
+    environment {
+        APP_NAME = "jobreader"
+        DEPLOY_PATH = "/opt/jar/jobreader"
+        BUILD_VERSION = "build-${BUILD_NUMBER}"
+    }
+
     stages {
+
         stage('Checkout') {
             steps {
                 echo 'Checking out code from GitHub...'
@@ -11,26 +18,57 @@ pipeline {
 
         stage('Build') {
             steps {
-                echo 'Building the application (tests skipped)...'
-                
-                
-                sh 'mvn clean install -DskipTests'
+                echo "Building application with version: ${BUILD_VERSION}"
+                sh "mvn clean package -DskipTests"
+            }
+        }
 
-                // If using Gradle:
-                // sh './gradlew build -x test'
+        stage('Prepare Artifact') {
+            steps {
+                script {
+                    // Find generated JAR (excluding original plain jar if multiple)
+                    def jarFile = sh(
+                        script: "ls target/*.jar | grep -v 'original' | head -n 1",
+                        returnStdout: true
+                    ).trim()
 
-                // If using npm:
-                // sh 'npm install && npm run build'
+                    echo "Found JAR: ${jarFile}"
+
+                    // Rename with build number
+                    sh """
+                    cp ${jarFile} target/${APP_NAME}-${BUILD_VERSION}.jar
+                    """
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo "Deploying to ${DEPLOY_PATH}"
+
+                sh """
+                mkdir -p ${DEPLOY_PATH}
+                cp target/${APP_NAME}-${BUILD_VERSION}.jar ${DEPLOY_PATH}/
+                """
+            }
+        }
+
+        stage('Restart Service') {
+            steps {
+                echo "Restarting service..."
+                sh """
+                sudo systemctl restart ${APP_NAME}
+                """
             }
         }
     }
 
     post {
         success {
-            echo 'Build completed successfully!'
+            echo "✅ Build ${BUILD_VERSION} deployed successfully!"
         }
         failure {
-            echo 'Build failed!'
+            echo "❌ Build failed!"
         }
     }
 }

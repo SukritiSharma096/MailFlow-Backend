@@ -50,4 +50,5 @@ public class ReceivedEmails {
     @Column(name = "task_created")
     private Boolean taskCreated = false;
 
+    private boolean processing;
 }

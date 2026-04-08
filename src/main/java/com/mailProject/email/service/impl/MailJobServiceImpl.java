@@ -1,19 +1,13 @@
 package com.mailProject.email.service.impl;
 
 import com.mailProject.email.dto.MailJobHistoryResponseDto;
-import com.mailProject.email.entity.Admin;
 import com.mailProject.email.entity.MailJobHistory;
 import com.mailProject.email.entity.MultipleEmailAccounts;
-import com.mailProject.email.repository.AdminRepository;
 import com.mailProject.email.repository.MailJobHistoryRepository;
 import com.mailProject.email.repository.MultipleEmailRepository;
-import com.mailProject.email.service.ClickupConfigService;
 import com.mailProject.email.service.MailJobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,15 +23,10 @@ public class MailJobServiceImpl implements MailJobService {
     private final MailJobHistoryRepository historyRepo;
     private final MultipleEmailRepository accountRepo;
 
-    @Autowired
-    private AdminRepository adminRepository;
-
-    @Autowired
-    private ClickupConfigService clickupConfigService;
-
     @Override
     @Transactional
     public void runJob(String runType) {
+
         MailJobHistory history = new MailJobHistory();
         history.setRunType(runType);
         history.setStartTime(LocalDateTime.now());
@@ -45,36 +34,20 @@ public class MailJobServiceImpl implements MailJobService {
         int totalTasks = 0;
         boolean anyFailure = false;
 
-        List<Admin> admins = adminRepository.findAllByActiveTrue();
+        List<MultipleEmailAccounts> accounts = accountRepo.findByActiveTrue();
 
-        for (Admin admin : admins) {
-
+        for (MultipleEmailAccounts account : accounts) {
             try {
-                SecurityContextHolder.getContext().setAuthentication(
-                        new UsernamePasswordAuthenticationToken(
-                                admin.getUsername(), null, List.of()
-                        )
-                );
-                if (!clickupConfigService.isConfigured()) {
-                    continue;
-                }
-
-                List<MultipleEmailAccounts> accounts =
-                        accountRepo.findByActiveTrue();
-
-                for (MultipleEmailAccounts account : accounts) {
-                    totalTasks += processingService.processNewMails(account.getId());
-                }
-
+                totalTasks += processingService.processNewMails(account.getId(), true);
             } catch (Exception e) {
                 anyFailure = true;
-            } finally {
-                SecurityContextHolder.clearContext();
+                log.error("Error in job execution for account {}: {}", account.getId(), e.getMessage(), e);
             }
         }
 
         history.setMailCount(totalTasks);
         history.setTaskCreated(totalTasks);
+
         if (totalTasks > 0 && !anyFailure) {
             history.setStatus("SUCCESS");
         } else if (totalTasks > 0) {
@@ -84,11 +57,8 @@ public class MailJobServiceImpl implements MailJobService {
         }
 
         history.setEndTime(LocalDateTime.now());
-
         historyRepo.save(history);
     }
-
-
 
     @Override
     public MailJobHistoryResponseDto getLatest() {

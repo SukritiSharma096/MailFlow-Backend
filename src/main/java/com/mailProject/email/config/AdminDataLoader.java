@@ -32,7 +32,7 @@ public class AdminDataLoader  implements CommandLineRunner {
 
             adminRepository.save(admin);
 
-            System.out.println("✅ Default Admin Created");
+            System.out.println(" Default Admin Created");
         }
     }
 }
